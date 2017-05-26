@@ -1,3 +1,12 @@
+#include <math.h>
+
+int forwardBackwardValue = 0;
+int leftRightValue = 0;
+boolean commandReady = false;
+boolean lRReady = false;
+boolean fBReady = false;
+
+
 void setup() 
 {
   // put your setup code here, to run once:
@@ -122,4 +131,40 @@ void CMD_Readme()
   Serial.println("Input format: Module>Command ");
   Serial.println("example= 2>0:50");
 }
+
+String createDriveCommand(int FBValue, int LRValue){
+  String motorCommand = "";
+  //Angle and magnitude calculations for the individual wheels
+
+  return motorCommand;
+}
+
+void readPS3Command(){
+  String serialResponse = Serial3.readStringUntil('\r\n');
+  char buf [serialResponse.length()];  
+  serialResponse.toCharArray(buf, sizeof(buf));
+  //debug stuff
+  Serial.println(serialResponse);
+
+  byte delimiter = serialResponse.indexOf(":");
+
+  String input = serialResponse.substring(0,delimiter);
+  String inputValue = serialResponse.substring(delimiter);
+  int value = inputValue.toInt();
+  
+  //Only Processing the commands for the sticks
+  if(input == "LY"){
+     forwardBackwardValue = value;
+     fBReady = true;
+  } else if( input == "LX") {
+    leftRightValue = value;
+    lRReady = true;
+  }
+
+  if(lRReady && fBReady){
+    createDriveCommand(forwardBackwardValue, leftRightValue);
+  }
+  
+}
+
 
