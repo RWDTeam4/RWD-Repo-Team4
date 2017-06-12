@@ -1,5 +1,13 @@
 #include <math.h>
 
+#ifndef M_PI_6
+  #define M_PI_6 0.52359877559829887307
+#endif
+
+#ifndef M_PI_3
+  #define M_PI_3 1.04719755119659774615
+#endif
+
 int forwardBackwardValue = 0;
 int leftRightValue = 0;
 boolean commandReady = false;
@@ -135,6 +143,40 @@ void CMD_Readme()
 String createDriveCommand(int FBValue, int LRValue){
   String motorCommand = "";
   //Angle and magnitude calculations for the individual wheels
+  int inY = 128 - FBValue;
+  int inX = LRValue - 128;
+  float myArcSin = asin(inY/128);
+  float myArcCosine = acos(inX/128);
+
+  //Set Motor Direction
+  if(inY >= 0 && myArcCosine > M_PI_4 && myArcCosine < (M_PI - M_PI_4)){
+    //All Motors Forward
+  }
+  if(inY < 0 && myArcCosine >  M_PI_4 && myArcCosine < (M_PI - M_PI_4)){
+    //All Motors Reverse
+  }
+  if(inX < 0 && myArcSin > -1*M_PI_4 && myArcSin < M_PI_4){
+    //Left Front Forward
+    //Right Front Revers
+    //Left Rear Reverse
+    //Left Front Forward
+
+  }
+  if(inX >= 0  && myArcSin > -1*M_PI_4 && myArcSin < M_PI_4){
+    //Left Front Reverse
+    //Right Front Forward
+    //Left Rear Forward
+    //Right Rear Reverse
+
+  }
+  //Set Motor Speed
+  if(myArcSin < M_PI_3 && myArcSin > M_PI_4){
+    //Scale Left Rear and Right Front
+  }
+  if(myArcSin < M_PI_4 && myArcSin > M_PI_6 ){
+    //Scale Left Rear and Right Front 
+  }
+
 
   return motorCommand;
 }
