@@ -8,6 +8,8 @@
   #define M_PI_3 1.04719755119659774615
 #endif
 
+//Create 2_M_PI_3, 3_M_PI_4, 5_M_PI_6
+
 int forwardBackwardValue = 0;
 int leftRightValue = 0;
 boolean commandReady = false;
@@ -145,40 +147,108 @@ String createDriveCommand(int FBValue, int LRValue){
   //Angle and magnitude calculations for the individual wheels
   int inY = 128 - FBValue;
   int inX = LRValue - 128;
-  float myArcSin = asin(inY/128);
-  float myArcCosine = acos(inX/128);
+  float myArcSin = asin(inY/128.0);
+  float myArcCosine = acos(inX/128.0);
+  char leftFrontState = 'S';
+  char rightFrontState = 'S';
+  char leftRearState = 'S';
+  char rightRearState = 'S';
+  float lfScaleFactor = 1;
+  float rfScaleFactor = 1;
+  float lrScaleFactor = 1;
+  float rrScaleFactor = 1;
+  float leftFront = 0;
+  float rightFront = 0;
+  float leftRear = 0;
+  float rightRear = 0;
 
   //Set Motor Direction
-  if(inY >= 0 && myArcCosine > M_PI_4 && myArcCosine < (M_PI - M_PI_4)){
-    //All Motors Forward
+  if(inY >= 0){
+    if(myArcCosine > M_PI_4 && myArcCosine < (M_PI - M_PI_4)){
+      //All Motors Forward
+      leftFrontState  = 'F';
+      rightFrontState = 'F';
+      leftRearState   = 'F';
+      rightRearState  = 'F';
+    }
+    if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3){
+      //Quadrant 1
+      myArcCosine > M_PI_4 ?  sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
+    }
+    if(myArcCosine > 2*M_PI_3 && myArcCosine < 5*M_PI_6){
+      //Quadrant 2
+      myArcCosine > 3*M_PI_4 ? sin(1.5*(myArcCosine - 3*M_PI_4)): sin(-1.5*(myArcCosine - 3*M_PI_4));
+    }
+    
+  } else { // y < 0
+    if(myArcCosine >  M_PI_4 && myArcCosine < (M_PI - M_PI_4)){
+      //All Motors Reverse
+      leftFrontState  = 'R';
+      rightFrontState = 'R';
+      leftRearState   = 'R';
+      rightRearState  = 'R';
+    }
+    if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3){
+      //Quadrant 4
+    }
+    if(myArcCosine > 2*M_PI_3 && myArcCosine < 5*M_PI_6){
+      //Quadrant 3
+    }
   }
-  if(inY < 0 && myArcCosine >  M_PI_4 && myArcCosine < (M_PI - M_PI_4)){
-    //All Motors Reverse
-  }
-  if(inX < 0 && myArcSin > -1*M_PI_4 && myArcSin < M_PI_4){
-    //Left Front Forward
-    //Right Front Revers
-    //Left Rear Reverse
-    //Left Front Forward
+  if(inX < 0){
+    if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4){
 
-  }
-  if(inX >= 0  && myArcSin > -1*M_PI_4 && myArcSin < M_PI_4){
-    //Left Front Reverse
-    //Right Front Forward
-    //Left Rear Forward
-    //Right Rear Reverse
+      //Left  Front Forward
+      //Right Front Revers
+      //Left  Rear  Reverse
+      //Right Rear  Forward
+      leftFrontState  = 'F';
+      rightFrontState = 'R';
+      leftRearState   = 'R';
+      rightRearState  = 'F';
+    }
+    if(myArcSin < M_PI_3 && myArcSin > M_PI_6 ){
+      //Quadrant 2
+      //Scale Left Front and Right Rear 
+      myArcSin > M_PI_4 ? sin(1.5*(myArcSin-M_PI_4)) : sin(-1.5*(myArcSin-M_PI_4));
+    }
+    if(myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6) {
+      //Quadrant 3
+      //Scale Right Front and Left Rear
+    }
 
+  } else { // x >= 0
+    if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4){
+      //Left Front Reverse
+      //Right Front Forward
+      //Left Rear Forward
+      //Right Rear Reverse
+      leftFrontState  = 'R';
+      rightFrontState = 'F';
+      leftRearState   = 'F';
+      rightRearState  = 'R';
+    }
+    if(myArcSin < M_PI_3 && myArcSin > M_PI_6 ){ 
+      //Quadrant 1
+      //Scale Left Rear and Right Front 
+      myArcSin > M_PI_4 ? sin(1.5*(myArcSin-M_PI_4)) : sin(-1.5*(myArcSin-M_PI_4));
+    }
+    if(myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6) {
+      //Quadrant 4
+      //Scale Right Rear and Left Front
+
+    }
   }
   //Set Motor Speed
-  if(myArcSin < M_PI_3 && myArcSin > M_PI_4){
-    //Scale Left Rear and Right Front
-  }
-  if(myArcSin < M_PI_4 && myArcSin > M_PI_6 ){
-    //Scale Left Rear and Right Front 
-  }
-
-
+  //Calculate Base motor speeds then convert to strings to be used
+  // leftFront = lfScaleFactor* 
   return motorCommand;
+}
+
+String calcMotorValueToHex(float raw){
+  String motorValInHex = "";
+  //ConvertFloat into two character hex.
+  return motorValInHex;
 }
 
 void readPS3Command(){
