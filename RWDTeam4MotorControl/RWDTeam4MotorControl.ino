@@ -33,7 +33,7 @@
   
 void setup()
 {
-  Serial.begin(230400);
+  Serial.begin(57600);
   Serial.println("<Arduino is ready>");
 
   pinMode(2,  INPUT);//Motor 1 Encoder A => Digital Pin 2

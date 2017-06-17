@@ -8,7 +8,20 @@
   #define M_PI_3 1.04719755119659774615
 #endif
 
-//Create 2_M_PI_3, 3_M_PI_4, 5_M_PI_6
+//Create M_PI_2_3, M_PI_3_4, M_PI_5_6
+
+#ifndef M_PI_3_4
+  #define M_PI_3_4 2.35619449019234492884
+#endif
+
+#ifndef M_PI_2_3
+  #define M_PI_2_3 2.09439510239319549230
+#endif
+
+#ifndef M_PI_5_6
+  #define M_PI_5_6 2.61799387799149436538
+#endif
+
 
 int forwardBackwardValue = 0;
 int leftRightValue = 0;
@@ -147,8 +160,9 @@ String createDriveCommand(int FBValue, int LRValue){
   //Angle and magnitude calculations for the individual wheels
   int inY = 128 - FBValue;
   int inX = LRValue - 128;
-  float myArcSin = asin(inY/128.0);
-  float myArcCosine = acos(inX/128.0);
+  float magnitude = sqrt(sq(inY) + sq(inX));
+  float myArcSin = asin(inY/magnitude);
+  float myArcCosine = acos(inX/magnitude);
   char leftFrontState = 'S';
   char rightFrontState = 'S';
   char leftRearState = 'S';
@@ -163,41 +177,37 @@ String createDriveCommand(int FBValue, int LRValue){
   float rightRear = 0;
 
   //Set Motor Direction
-  if(inY >= 0){
-    if(myArcCosine > M_PI_4 && myArcCosine < (M_PI - M_PI_4)){
-      //All Motors Forward
-      leftFrontState  = 'F';
-      rightFrontState = 'F';
-      leftRearState   = 'F';
-      rightRearState  = 'F';
-    }
-    if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3){
-      //Quadrant 1
-      myArcCosine > M_PI_4 ?  sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
-    }
-    if(myArcCosine > 2*M_PI_3 && myArcCosine < 5*M_PI_6){
-      //Quadrant 2
-      myArcCosine > 3*M_PI_4 ? sin(1.5*(myArcCosine - 3*M_PI_4)): sin(-1.5*(myArcCosine - 3*M_PI_4));
-    }
-    
-  } else { // y < 0
-    if(myArcCosine >  M_PI_4 && myArcCosine < (M_PI - M_PI_4)){
+  if(myArcCosine > M_PI_4 && myArcCosine < M_PI_3_4 && myArcSin > M_PI_4){
+    //All Motors Forward
+    leftFrontState  = 'F';
+    rightFrontState = 'F';
+    leftRearState   = 'F';
+    rightRearState  = 'F';
+  }
+    // if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3){
+    //   //Quadrant 1
+    //   rfScaleFactor = myArcCosine > M_PI_4 ?  sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
+    // }
+    // if(myArcCosine > M_PI_2_3 && myArcCosine < M_PI_5_6){
+    //   //Quadrant 2
+    //   lfScaleFactor = myArcCosine > M_PI_3_4 ? sin(1.5*(myArcCosine - M_PI_3_4)): sin(-1.5*(myArcCosine - M_PI_3_4));
+    // }
+  if(myArcCosine >  M_PI_4 && myArcCosine < M_PI_3_4 && myArcSin < -1*M_PI_4){
       //All Motors Reverse
       leftFrontState  = 'R';
       rightFrontState = 'R';
       leftRearState   = 'R';
       rightRearState  = 'R';
-    }
-    if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3){
-      //Quadrant 4
-    }
-    if(myArcCosine > 2*M_PI_3 && myArcCosine < 5*M_PI_6){
-      //Quadrant 3
-    }
   }
-  if(inX < 0){
-    if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4){
-
+    // if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3){
+    //   //Quadrant 4
+    //   lfScaleFactor = myArcCosine > M_PI_4 ? sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
+    // }
+    // if(myArcCosine > M_PI_2_3 && myArcCosine < M_PI_5_6){
+    //   //Quadrant 3
+    //   lfScaleFactor = myArcCosine > M_PI_3_4 ? sin(1.5*(myArcCosine - M_PI_3_4)): sin(-1.5*(myArcCosine - M_PI_3_4));
+    // }
+  if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4 && myArcCosine > M_PI_3_4){
       //Left  Front Forward
       //Right Front Revers
       //Left  Rear  Reverse
@@ -206,19 +216,18 @@ String createDriveCommand(int FBValue, int LRValue){
       rightFrontState = 'R';
       leftRearState   = 'R';
       rightRearState  = 'F';
-    }
-    if(myArcSin < M_PI_3 && myArcSin > M_PI_6 ){
-      //Quadrant 2
-      //Scale Left Front and Right Rear 
-      myArcSin > M_PI_4 ? sin(1.5*(myArcSin-M_PI_4)) : sin(-1.5*(myArcSin-M_PI_4));
-    }
-    if(myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6) {
-      //Quadrant 3
-      //Scale Right Front and Left Rear
-    }
-
-  } else { // x >= 0
-    if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4){
+  }
+    // if(myArcSin < M_PI_3 && myArcSin > M_PI_6 ){
+    //   //Quadrant 2
+    //   //Scale Left Front and Right Rear 
+    //   lfScaleFactor = myArcSin > M_PI_4 ? sin(1.5*(myArcSin-M_PI_4)) : sin(-1.5*(myArcSin-M_PI_4));
+    // }
+    // if(myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6) {
+    //   //Quadrant 3
+    //   //Scale Right Front and Left Rear
+    //   rfScaleFactor = myArcSin > -1*M_PI_4 ? sin(1.5*(myArcSin+M_PI_2)) : sin(-1.5*(myArcSin+M_PI_2));
+    // }
+  if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4 && myArcCosine < M_PI_4){
       //Left Front Reverse
       //Right Front Forward
       //Left Rear Forward
@@ -227,27 +236,53 @@ String createDriveCommand(int FBValue, int LRValue){
       rightFrontState = 'F';
       leftRearState   = 'F';
       rightRearState  = 'R';
-    }
-    if(myArcSin < M_PI_3 && myArcSin > M_PI_6 ){ 
-      //Quadrant 1
-      //Scale Left Rear and Right Front 
-      myArcSin > M_PI_4 ? sin(1.5*(myArcSin-M_PI_4)) : sin(-1.5*(myArcSin-M_PI_4));
-    }
-    if(myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6) {
-      //Quadrant 4
-      //Scale Right Rear and Left Front
-
-    }
+  }
+    // if(myArcSin < M_PI_3 && myArcSin > M_PI_6 ){ 
+    //   //Quadrant 1
+    //   //Scale Left Rear and Right Front 
+    //   rfScaleFactor = myArcSin > M_PI_4 ? sin(1.5*(myArcSin-M_PI_4)) : sin(-1.5*(myArcSin-M_PI_4));
+    // }
+    // if(myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6) {
+    //   //Quadrant 4
+    //   //Scale Right Rear and Left Front
+    //   lfScaleFactor = myArcSin > -1*M_PI_4 ? sin(1.5*(myArcSin+M_PI_2)) : sin(-1.5*(myArcSin+M_PI_2));
+    // }
+  
+  if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3 && myArcSin < M_PI_3 && myArcSin > M_PI_6){
+    //Quadrant 1
+    rfScaleFactor = myArcCosine > M_PI_4 ?  sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
+  }
+  if(myArcCosine > M_PI_2_3 && myArcCosine < M_PI_5_6 && myArcSin < M_PI_3 && myArcSin > M_PI_6){
+    //Quadrant 2
+    lfScaleFactor = myArcCosine > M_PI_3_4 ? sin(1.5*(myArcCosine - M_PI_3_4)): sin(-1.5*(myArcCosine - M_PI_3_4));
+  }
+  if(myArcCosine > M_PI_2_3 && myArcCosine < M_PI_5_6 && myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6){
+    //Quadrant 3
+    rfScaleFactor = myArcCosine > M_PI_3_4 ? sin(1.5*(myArcCosine - M_PI_3_4)): sin(-1.5*(myArcCosine - M_PI_3_4));
+  }
+  if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3 && myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6){
+    //Quadrant 4
+    lfScaleFactor = myArcCosine > M_PI_4 ? sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
   }
   //Set Motor Speed
   //Calculate Base motor speeds then convert to strings to be used
-  // leftFront = lfScaleFactor* 
+  leftFront = lfScaleFactor*magnitude;
+  rightFront = rfScaleFactor*magnitude;
+  leftRear = rfScaleFactor*magnitude;
+  rightRear = lfScaleFactor*magnitude;
+
+  motorCommand = leftFrontState + calcMotorValueToHex(leftFront);
+  motorCommand += leftRearState + calcMotorValueToHex(leftRear);
+  motorCommand += rightFrontState + calcMotorValueToHex(rightFront);
+  motorCommand += rightRearState + calcMotorValueToHex(rightRear);
   return motorCommand;
 }
 
+//ConvertFloat into two character hex.
 String calcMotorValueToHex(float raw){
   String motorValInHex = "";
-  //ConvertFloat into two character hex.
+
+  
   return motorValInHex;
 }
 
