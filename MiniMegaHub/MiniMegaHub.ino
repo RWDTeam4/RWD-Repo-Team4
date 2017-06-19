@@ -280,9 +280,8 @@ String createDriveCommand(int FBValue, int LRValue){
 
 //ConvertFloat into two character hex.
 String calcMotorValueToHex(float raw){
-  String motorValInHex = "";
-
-  
+  int rawInt = (int) (raw/128)*255;
+  String motorValInHex = String(rawInt, HEX);
   return motorValInHex;
 }
 
