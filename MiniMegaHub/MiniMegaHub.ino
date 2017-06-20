@@ -23,11 +23,11 @@
 #endif
 
 
-int forwardBackwardValue = 0;
-int leftRightValue = 0;
+int lyValue = 0;
+int lxValue = 0;
 boolean commandReady = false;
-boolean lRReady = false;
-boolean fBReady = false;
+boolean lxReady = false;
+boolean lyReady = false;
 
 
 void setup() 
@@ -47,7 +47,8 @@ void loop()
   // put your main code here, to run repeatedly:
   if (Serial.available()>0)
   {
-  readCMD();
+    // readCMD();
+    readPS3Command();
   }
   if (Serial1.available())
   {
@@ -155,11 +156,11 @@ void CMD_Readme()
   Serial.println("example= 2>0:50");
 }
 
-String createDriveCommand(int FBValue, int LRValue){
+String createDriveCommand(int yValue, int xValue){
   String motorCommand = "";
   //Angle and magnitude calculations for the individual wheels
-  int inY = 128 - FBValue;
-  int inX = LRValue - 128;
+  int inY = 128 - yValue;
+  int inX = xValue - 128;
   float magnitude = sqrt(sq(inY) + sq(inX));
   float myArcSin = asin(inY/magnitude);
   float myArcCosine = acos(inX/magnitude);
@@ -282,11 +283,14 @@ String createDriveCommand(int FBValue, int LRValue){
 String calcMotorValueToHex(float raw){
   int rawInt = (int) (raw/128)*255;
   String motorValInHex = String(rawInt, HEX);
+  if(rawInt <= 0xF){
+    motorValInHex = "0" + motorValInHex;
+  }
   return motorValInHex;
 }
 
 void readPS3Command(){
-  String serialResponse = Serial3.readStringUntil('\r\n');
+  String serialResponse = Serial.readStringUntil('\r\n');
   char buf [serialResponse.length()];  
   serialResponse.toCharArray(buf, sizeof(buf));
   //debug stuff
@@ -295,20 +299,24 @@ void readPS3Command(){
   byte delimiter = serialResponse.indexOf(":");
 
   String input = serialResponse.substring(0,delimiter);
-  String inputValue = serialResponse.substring(delimiter);
+  Serial.println(input);
+  String inputValue = serialResponse.substring(delimiter+1);
+  Serial.println(inputValue);
   int value = inputValue.toInt();
   
   //Only Processing the commands for the sticks
-  if(input == "LY"){
-     forwardBackwardValue = value;
-     fBReady = true;
-  } else if( input == "LX") {
-    leftRightValue = value;
-    lRReady = true;
+  if(input == "@LY"){
+     lyValue = value;
+     lyReady = true;
+  } else if( input == "@LX") {
+    lxValue = value;
+    lxReady = true;
   }
 
-  if(lRReady && fBReady){
-    createDriveCommand(forwardBackwardValue, leftRightValue);
+  if(lxReady && lyReady){
+    Serial.println(createDriveCommand(lyValue, lxValue));
+    lxReady = false;
+    lyReady = false;
   }
   
 }
