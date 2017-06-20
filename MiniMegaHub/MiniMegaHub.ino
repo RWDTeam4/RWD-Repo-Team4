@@ -47,12 +47,13 @@ void loop()
   // put your main code here, to run repeatedly:
   if (Serial.available()>0)
   {
-    // readCMD();
-    readPS3Command();
+    readCMD();
+    // readPS3Command();
   }
   if (Serial1.available())
   {
-     Serial.write(Serial1.read());
+    readPS3Command();
+     // Serial.write(Serial1.read());
   }
   if (Serial2.available())
   {
@@ -61,6 +62,7 @@ void loop()
   if (Serial3.available())
   {
      Serial.write(Serial3.read());
+    
   }
 }
 
@@ -159,8 +161,12 @@ void CMD_Readme()
 String createDriveCommand(int yValue, int xValue){
   String motorCommand = "";
   //Angle and magnitude calculations for the individual wheels
-  int inY = 128 - yValue;
-  int inX = xValue - 128;
+  int inY = 127 - yValue;
+  int inX = xValue - 127;
+  inY = inY >= 128 ? 127 : inY;
+  inX = inX >= 128 ? 127 : inX;
+  inY = inY <= -128 ? -127 : inY;
+  inX = inX <= -128 ? -127 : inX;
   float magnitude = sqrt(sq(inY) + sq(inX));
   float myArcSin = asin(inY/magnitude);
   float myArcCosine = acos(inX/magnitude);
@@ -276,12 +282,14 @@ String createDriveCommand(int yValue, int xValue){
   motorCommand += leftRearState + calcMotorValueToHex(leftRear);
   motorCommand += rightFrontState + calcMotorValueToHex(rightFront);
   motorCommand += rightRearState + calcMotorValueToHex(rightRear);
+  Serial.println(motorCommand);
   return motorCommand;
 }
 
 //ConvertFloat into two character hex.
 String calcMotorValueToHex(float raw){
-  int rawInt = (int) (raw/128)*255;
+  int rawInt = (int) ((raw/127.0)*255.0);
+  rawInt = rawInt > 255 ? 255 : rawInt;
   String motorValInHex = String(rawInt, HEX);
   if(rawInt <= 0xF){
     motorValInHex = "0" + motorValInHex;
@@ -290,18 +298,14 @@ String calcMotorValueToHex(float raw){
 }
 
 void readPS3Command(){
-  String serialResponse = Serial.readStringUntil('\r\n');
+  String serialResponse = Serial1.readStringUntil('\r\n');
   char buf [serialResponse.length()];  
   serialResponse.toCharArray(buf, sizeof(buf));
   //debug stuff
-  Serial.println(serialResponse);
-
   byte delimiter = serialResponse.indexOf(":");
 
   String input = serialResponse.substring(0,delimiter);
-  Serial.println(input);
   String inputValue = serialResponse.substring(delimiter+1);
-  Serial.println(inputValue);
   int value = inputValue.toInt();
   
   //Only Processing the commands for the sticks
@@ -314,7 +318,7 @@ void readPS3Command(){
   }
 
   if(lxReady && lyReady){
-    Serial.println(createDriveCommand(lyValue, lxValue));
+    Serial2.print(createDriveCommand(lyValue, lxValue));
     lxReady = false;
     lyReady = false;
   }
