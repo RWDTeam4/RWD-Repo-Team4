@@ -1,85 +1,51 @@
-  char incoming[12] = "";
-  byte charCount = 0;
-  byte motorCount = 0;
-  byte motorDirection = B00000000;
-  long command = 0x0;
-  boolean enable = true;
-  unsigned long currentTime;
-  static byte commandLength = 12; //Total Length of command
-  static byte subCommandLength = 3;
-  boolean commandReadComplete = false;
-  boolean commandReady = false;
+static String ack = "ACK";  
 
-  unsigned long timerM1;
-  unsigned long timerM2;
-  unsigned long timerM3;
-  unsigned long timerM4;
+char incoming[12] = "";
+byte charCount = 0;
+byte motorCount = 0;
+byte motorDirection = B00000000;
+long command = 0x0;
+boolean enable = true;
+unsigned long currentTime;
+static byte commandLength = 12; //Total Length of command
+static byte subCommandLength = 3;
+boolean commandReadComplete = false;
+boolean commandReady = false;
 
-  unsigned short dutyLimit = 254; //Actual max value allowed
-  unsigned short dutyAmountM1 = 0;
-  unsigned short dutyAmountM2 = 0;
-  unsigned short dutyAmountM3 = 0;
-  unsigned short dutyAmountM4 = 0;
+unsigned long timerM1;
+unsigned long timerM2;
+unsigned long timerM3;
+unsigned long timerM4;
+unsigned long autoTimeout;
+static unsigned long timeout = 60000000; //60 seconds
 
-  boolean drivingM1 = false;
-  boolean drivingM2 = false;
-  boolean drivingM3 = false;
-  boolean drivingM4 = false;
+static unsigned short dutyLimit = 254; //Actual max value allowed
+unsigned short dutyAmountM1 = 0;
+unsigned short dutyAmountM2 = 0;
+unsigned short dutyAmountM3 = 0;
+unsigned short dutyAmountM4 = 0;
 
-//  boolean forwardM1 = true;
-//  boolean forwardM2 = true;
-//  boolean forwardM3 = true;
-//  boolean forwardM4 = true;
+boolean drivingM1 = false;
+boolean drivingM2 = false;
+boolean drivingM3 = false;
+boolean drivingM4 = false;
   
 void setup()
 {
-  Serial.begin(57600);
-  Serial.println("<Arduino is ready>");
-
-  pinMode(2,  INPUT);//Motor 1 Encoder A => Digital Pin 2
-  pinMode(3,  INPUT);//Motor 1 Encoder B => Digital Pin 3
-  pinMode(4,  INPUT);//Motor 2 Encoder A => Digital Pin 4
-  pinMode(5,  INPUT);//Motor 2 Encoder B => Digital Pin 5
-  pinMode(7,  INPUT);//Motor 3 Encoder A => Digital Pin 7
-  pinMode(8,  INPUT);//Motor 3 Encoder B => Digital Pin 8
-  pinMode(12, INPUT);//Motor 4 Encoder A => Digital Pin 12
-  pinMode(13, INPUT);//Motor 4 Encoder B => Digital Pin 13
-  pinMode(6,  OUTPUT);//Motor 1 Output PWM => Digital Pin 6
-  pinMode(9,  OUTPUT);//Motor 2 Output PWM => Digital Pin 9
-  pinMode(10, OUTPUT);//Motor 3 Output PWM => Digital Pin 10
-  pinMode(11, OUTPUT);//Motor 4 Output PWM => Digital Pin 11
-  pinMode(A0, OUTPUT);//Serial Output Pin => Analog Pin 0
-  pinMode(A1, OUTPUT);//Serial Clear Pin => Analog Pin 1
-  pinMode(A2, OUTPUT);//Clock Pin for the output => Analog Pin 2
-//  pinMode(A3, OUTPUT);//Motor 4 Ourput Direction => Analog Pin 3
-
-  writeCommand();
-
-  timerM1 = micros();
-  timerM2 = micros();
-  timerM3 = micros();
-  timerM4 = micros();
-
-  digitalWrite(6, LOW);
-  digitalWrite(9, LOW);
-  digitalWrite(10, LOW);
-  digitalWrite(11, LOW);
-
-  digitalWrite(A0, LOW);
-  digitalWrite(A1, LOW);
-  digitalWrite(A2, LOW);
-  digitalWrite(A3, LOW);
-
-  Serial.println("Setup Finished");
-
-  charCount = 0;
+  Serial.begin(115200);
+  initializeMcm();
+  delay(100);
+  handshake();
 }
 
 void loop()
 {
-//  delay(100);
+  currentTime = micros();
+  if(currentTime - autoTimeout >= timeout) {
+    disableMcm();
+  }
+  writeCommand();
   if(enable){
-    currentTime = micros();
     if(commandReadComplete){
       commandReadComplete = false;
       commandReady = false;
@@ -109,30 +75,21 @@ void loop()
       switch(motorCount){
         case 0:
           dutyAmountM1 = dutyAmount;
-//          Serial.print("Motor 1: ");
-//          Serial.println(dutyAmountM1);
           break;
         case 1:
           dutyAmountM2 = dutyAmount;
-//          Serial.print("Motor 2: ");
-//          Serial.println(dutyAmountM2);
           break;
         case 2:
           dutyAmountM3 = dutyAmount;
-//          Serial.print("Motor 3: ");
-//          Serial.println(dutyAmountM3);
           break;
         case 3:
           dutyAmountM4 = dutyAmount;
-//          Serial.print("Motor 4: ");
-//          Serial.println(dutyAmountM4);
           commandReadComplete = true;
           break;
       }
       motorCount++;
     }
     
-      
     switch(command<<motorCount){
       case 0x44: //D
       case 0x64: //d
@@ -142,11 +99,7 @@ void loop()
       case 0x190:
       case 0x220:
       case 0x320:
-        drivingM1 = drivingM2 = drivingM3 = drivingM4 = enable = false;
-        command=0x0;
-        PORTD &= ~B01000000; //Pin 6 Low
-        PORTB &= ~B00001110; //Pins 9,10,11 Low
-        motorDirection &= B00000000;
+        disableMcm();
         break;
 
       case 0x46: //F Motor 1
@@ -202,7 +155,6 @@ void loop()
         break;
       case 0xa4: //R Motor 2
       case 0xe4: //r Motor 2
-        //Reverse Stuff
         timerM2 = micros();
         PORTB &= ~B00000010;
         motorDirection |= B00001000;
@@ -212,8 +164,7 @@ void loop()
         command = 0x0;
         break;
       case 0x148: //R Motor 3
-      case 0x1c8: //r Motor 2
-        //Reverse Stuff
+      case 0x1c8: //r Motor 3
         timerM3 = micros();
         PORTB &= ~B00000100;
         motorDirection |= B00010000;
@@ -223,7 +174,7 @@ void loop()
         command = 0x0;
         break;
       case 0x290: //R Motor 4
-      case 0x390: //r Motor 2
+      case 0x390: //r Motor 4
         timerM4 = micros();
         PORTB &= ~B00001000;
         motorDirection |= B01000000;
@@ -281,9 +232,12 @@ void loop()
 	    PORTB ^= B00001000; 
 	    timerM4 = micros();
 	  }
-
-    writeCommand();
+  } else {
+    //Go into blocking wait call in order to reset
+    handshake();
+    resetMCM();
   }
+  
 }
 
 int charToHex(char c){
@@ -302,6 +256,87 @@ int charToHex(char c){
 void writeCommand(){
   PORTC &= B11111101; //Pin A1 Low
   shiftOut(A0, A2, MSBFIRST, motorDirection); //Serial Pin, Clock Pin, Bit direction, Value
-  PORTC |= B00000010; //Pin A1 Low
+  PORTC |= B00000010; //Pin A1 High
 }
 
+void resetMCM(){
+  motorCount = 0;
+  dutyAmountM1 = 0;
+  dutyAmountM2 = 0;
+  dutyAmountM3 = 0;
+  dutyAmountM4 = 0;
+  enable = true;
+  memset(incoming, 0, sizeof(incoming));
+  command = 0x0;
+
+  commandReadComplete = false;
+  commandReady = false;
+
+  initializeMcm();
+}
+
+void initializeMcm(){
+  Serial.println("Motor Control Module is ready");
+
+  pinMode(2,  INPUT);//Motor 1 Encoder A => Digital Pin 2
+  pinMode(3,  INPUT);//Motor 1 Encoder B => Digital Pin 3
+  pinMode(4,  INPUT);//Motor 2 Encoder A => Digital Pin 4
+  pinMode(5,  INPUT);//Motor 2 Encoder B => Digital Pin 5
+  pinMode(7,  INPUT);//Motor 3 Encoder A => Digital Pin 7
+  pinMode(8,  INPUT);//Motor 3 Encoder B => Digital Pin 8
+  pinMode(12, INPUT);//Motor 4 Encoder A => Digital Pin 12
+  pinMode(13, INPUT);//Motor 4 Encoder B => Digital Pin 13
+  pinMode(6,  OUTPUT);//Motor 1 Output PWM => Digital Pin 6
+  pinMode(9,  OUTPUT);//Motor 2 Output PWM => Digital Pin 9
+  pinMode(10, OUTPUT);//Motor 3 Output PWM => Digital Pin 10
+  pinMode(11, OUTPUT);//Motor 4 Output PWM => Digital Pin 11
+  pinMode(A0, OUTPUT);//Serial Output Pin => Analog Pin 0
+  pinMode(A1, OUTPUT);//Serial Clear Pin => Analog Pin 1
+  pinMode(A2, OUTPUT);//Clock Pin for the output => Analog Pin 2
+
+  writeCommand();
+
+  timerM1 = micros();
+  timerM2 = micros();
+  timerM3 = micros();
+  timerM4 = micros();
+  autoTimeout = micros();
+
+  digitalWrite(6, LOW);
+  digitalWrite(9, LOW);
+  digitalWrite(10, LOW);
+  digitalWrite(11, LOW);
+
+  digitalWrite(A0, LOW);
+  digitalWrite(A1, LOW);
+  digitalWrite(A2, LOW);
+  digitalWrite(A3, LOW);
+
+  Serial.println("Setup Finished for MCM");
+
+  charCount = 0;
+}
+
+void handshake(){
+  String input = "";
+  Serial.println("MCM Beginning Handshake...");
+  while(input.indexOf("ACK") < 0){
+    if(Serial.available()){
+      input = Serial.readStringUntil('\r\n');
+      // Serial.println(input); //Debug Input is correctly read
+      delay(100);
+    }
+  }
+  Serial.println("ACK");
+  delay(10);
+  Serial.println("MCM Handshake Successful");
+}
+
+void disableMcm() {
+  Serial.println("DISABLED:MCM");
+  drivingM1 = drivingM2 = drivingM3 = drivingM4 = enable = false;
+  command=0x0;
+  PORTD &= ~B01000000; //Pin 6 Low
+  PORTB &= ~B00001110; //Pins 9,10,11 Low
+  motorDirection &= B00000000;  
+}

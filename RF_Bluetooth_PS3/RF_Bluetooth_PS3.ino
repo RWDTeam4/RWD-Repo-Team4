@@ -18,8 +18,9 @@ USB Usb;
 
 BTD Btd(&Usb); // You have to create the Bluetooth Dongle instance like so
 /* You can create the instance of the class in two ways */
-PS3BT PS3(&Btd); // This will just create the instance
-//PS3BT PS3(&Btd, 0x00, 0x1A, 0x7D, 0xDA, 0x71, 0x13); // This will also store the bluetooth address - this can be obtained from the dongle when running the sketch
+// PS3BT PS3(&Btd); // This will just create the instance
+// PS3BT PS3(&Btd, 0x00, 0x1A, 0x7D, 0xDA, 0x71, 0x13); // This will also store the bluetooth address - this can be obtained from the dongle when running the sketch
+PS3BT PS3(&Btd, 0xE0, 0xAE, 0x5E, 0x29, 0x8F, 0x51); // This will also store the bluetooth address - this can be obtained from the dongle when running the sketch
 
 bool printTemperature, printAngle;
 static String endDelimiter = "\r\n";
@@ -36,6 +37,8 @@ void setup() {
   }
   Serial.print(F("PS3 Bluetooth Library Started"));
   Serial.print(endDelimiter);
+  delay(100);
+  handshake();
 }
 void loop() {
   Usb.Task();
@@ -67,7 +70,7 @@ void loop() {
       Serial.print(F("@L2:"));
       Serial.print(PS3.getAnalogButton(L2));
       Serial.print(endDelimiter);
-      Serial.println()
+      Serial.println();
       if (PS3.PS3Connected) 
       {
         Serial.print(F("@R2:"));
@@ -225,4 +228,18 @@ void loop() {
     }
   }
 #endif
+}
+
+void handshake(){
+  Serial.println("RFM Beginning Handshake...");
+  String input = "";
+  while(input.indexOf("ACK") < 0){
+    if(Serial.available()){
+      input = Serial.readStringUntil('\n');
+      delay(100);
+    }
+  }
+  Serial.println("ACK");
+  delay(10);
+  Serial.println("RFM Handshake Successful");
 }

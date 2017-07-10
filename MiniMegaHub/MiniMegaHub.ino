@@ -25,9 +25,18 @@
 
 int lyValue = 0;
 int lxValue = 0;
+int ryValue = 0;
+int rxValue = 0;
 boolean commandReady = false;
 boolean lxReady = false;
 boolean lyReady = false;
+boolean rxReady = false;
+boolean ryReady = false;
+boolean mcmReady = false;
+boolean rfReady = false;
+boolean acReady = false;
+
+String ack = "ACK";
 
 
 void setup() 
@@ -35,34 +44,52 @@ void setup()
   // put your setup code here, to run once:
   Serial.begin(57600);
   Serial1.begin(57600); //AC
-  Serial2.begin(57600); //MCM
+  Serial2.begin(115200); //MCM
   Serial3.begin(57600); //RF
   Serial.println("?????????");
   CMD_Readme();
-  
+  delay(2000);
+  Serial2.println(ack);
+  Serial3.println(ack);
 }
 
 void loop() 
 {
   // put your main code here, to run repeatedly:
-  if (Serial.available()>0)
+  if (Serial.available())
   {
     readCMD();
-    // readPS3Command();
   }
-  if (Serial1.available())
-  {
-    readPS3Command();
-     // Serial.write(Serial1.read());
-  }
-  if (Serial2.available())
-  {
-     Serial.write(Serial2.read());
+  // if (Serial1.available())
+  // {
+  //   Serial.print(Serial1.readStringUntil('\r\n'));
+  // }
+  if(Serial2.available()){
+    String mcmInput = Serial2.readStringUntil('\r\n');
+    if(mcmInput.indexOf("DISABLED") >= 0){
+      mcmReady = false;
+    }
+    if(mcmReady){
+      Serial.println(mcmInput);
+    } else {
+      if(mcmInput.indexOf(ack) >= 0){
+        mcmReady = true;
+      } else {
+       Serial.println(mcmInput);
+      }
+    }
   }
   if (Serial3.available())
   {
-     Serial.write(Serial3.read());
-    
+    if(rfReady){
+      readPS3Command();
+    } else {
+      String rfInput = Serial3.readStringUntil('\r\n');
+      if(rfInput.indexOf(ack) >= 0){
+      } else {
+        Serial.println(rfInput);
+      }
+    }
   }
 }
 
@@ -157,6 +184,9 @@ void CMD_Readme()
   Serial.println("Input format: Module>Command ");
   Serial.println("example= 2>0:50");
 }
+
+//TODO Calculate the rx and ry values as well as the already calculated lx and ly values
+//    This will be an average of the two sets of stick values allowing for driveablility via the sticks
 
 String createDriveCommand(int yValue, int xValue){
   String motorCommand = "";
@@ -298,26 +328,35 @@ String calcMotorValueToHex(float raw){
 }
 
 void readPS3Command(){
-  String serialResponse = Serial1.readStringUntil('\r\n');
-  char buf [serialResponse.length()];  
-  serialResponse.toCharArray(buf, sizeof(buf));
+  String serialResponse = Serial3.readStringUntil('\r\n');
+  // char buf [serialResponse.length()];  
+  // serialResponse.toCharArray(buf, sizeof(buf));
   //debug stuff
   byte delimiter = serialResponse.indexOf(":");
 
-  String input = serialResponse.substring(0,delimiter);
-  String inputValue = serialResponse.substring(delimiter+1);
+  String input = (serialResponse.substring(0,delimiter)).trim();
+  String inputValue = serialResponse.substring(delimiter+1).trim();
   int value = inputValue.toInt();
   
   //Only Processing the commands for the sticks
   if(input == "@LY"){
      lyValue = value;
      lyReady = true;
-  } else if( input == "@LX") {
+  }
+  if( input == "@LX") {
     lxValue = value;
     lxReady = true;
+  } 
+  if( input == "@RY") {
+    rxValue = value;
+    rxReady = true;
+  }
+  if( input == "@RX") {
+    rxValue = value;
+    rxReady = true;
   }
 
-  if(lxReady && lyReady){
+  if(lxReady && lyReady && rxReady && ryReady){
     Serial2.print(createDriveCommand(lyValue, lxValue));
     lxReady = false;
     lyReady = false;
