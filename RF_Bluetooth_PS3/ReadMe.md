@@ -1,4 +1,4 @@
-##Stick Interpretation
+## Stick Interpretation
 
 * LX => Left Stick X-Axis
 * 0-255: 128 is dead center of stick
