@@ -23,7 +23,7 @@ BTD Btd(&Usb); // You have to create the Bluetooth Dongle instance like so
 PS3BT PS3(&Btd, 0xE0, 0xAE, 0x5E, 0x29, 0x8F, 0x51); // This will also store the bluetooth address - this can be obtained from the dongle when running the sketch
 
 bool printTemperature, printAngle;
-static String endDelimiter = "\r\n";
+// static String endDelimiter = "\r\n";
 
 void setup() {
   Serial.begin(57600);
