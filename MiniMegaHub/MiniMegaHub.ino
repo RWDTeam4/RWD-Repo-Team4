@@ -185,21 +185,71 @@ void CMD_Readme()
   Serial.println("example= 2>0:50");
 }
 
-//TODO Calculate the rx and ry values as well as the already calculated lx and ly values
-//    This will be an average of the two sets of stick values allowing for driveablility via the sticks
-
-String createDriveCommand(int yValue, int xValue){
+/**
+ *  Using Joystick values, creates the command to be sent to the Motor Control Module
+ */
+String createDriveCommand(int lyValue, int lxValue, int ryValue, int rxValue){
   String motorCommand = "";
-  //Angle and magnitude calculations for the individual wheels
-  int inY = 127 - yValue;
-  int inX = xValue - 127;
-  inY = inY >= 128 ? 127 : inY;
-  inX = inX >= 128 ? 127 : inX;
-  inY = inY <= -128 ? -127 : inY;
-  inX = inX <= -128 ? -127 : inX;
-  float magnitude = sqrt(sq(inY) + sq(inX));
-  float myArcSin = asin(inY/magnitude);
-  float myArcCosine = acos(inX/magnitude);
+  String steeringCommand = "";
+  String movementCommand = "";
+
+  steeringCommand = calculateSteering(rxValue, ryValue);
+  movementCommand = calculateMovement(lxValue, lyValue);
+
+  motorCommand = mixSteeringAndMovement(movementCommand, steeringCommand);
+  
+  Serial.println(motorCommand); //Debug Statement
+  return motorCommand;
+}
+
+/**
+ *  Only uses the x axis value to judge whether you're stearing left or right
+ */
+String calculateSteering(int rxValue, int ryValue) {
+  String motorCommand = "";
+  char leftFrontState = 'S';
+  char rightFrontState = 'S';
+  char leftRearState = 'S';
+  char rightRearState = 'S';
+  if(rxValue > 127.5){
+    leftFrontState = 'F';
+    leftRearState = 'F';
+    rightFrontState = 'R';
+    rightRearState = 'R';
+  } 
+  if(rxValue < 127.5){
+    leftFrontState = 'R';
+    leftRearState = 'R';
+    rightFrontState = 'F';
+    rightRearState = 'F';
+  }
+
+  float motorIntensityRaw = (rxValue / 127.0) * 255.0;
+  motorIntensityRaw = motorIntensityRaw > 255.0 ? 255.0 : motorIntensityRaw; //Cap this value
+  String motorIntensityString = calcMotorValueToHex(motorIntensityRaw);
+
+  motorCommand = leftFrontState + motorIntensityString + leftRearState + motorIntensityString;
+  motorCommand += rightFrontState + motorIntensityString + rightRearState + motorIntensityString;
+  
+  return motorCommand;
+}
+
+/**
+ *  Basic Mecanum movement, derives motor values based on angles and directional ma
+ */
+String calculateMovement(int lxValue, int lyValue){
+  
+  String motorCommand = "";
+
+  float inLy = 127.5 - lyValue;
+  float inLx = lxValue - 127.5;
+  inLy = inLy >= 127.5 ? 127.5 : inLy;
+  inLx = inLx >= 127.5 ? 127.5 : inLx;
+  inLy = inLy <= -127.5 ? -127.5 : inLy;
+  inLx = inLx <= -127.5 ? -127.5 : inLx;
+  float magnitude = sqrt(sq(inLy) + sq(inLx));
+  float myArcSin = asin(inLy/magnitude);
+  float myArcCosine = acos(inLx/magnitude);
   char leftFrontState = 'S';
   char rightFrontState = 'S';
   char leftRearState = 'S';
@@ -221,14 +271,6 @@ String createDriveCommand(int yValue, int xValue){
     leftRearState   = 'F';
     rightRearState  = 'F';
   }
-    // if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3){
-    //   //Quadrant 1
-    //   rfScaleFactor = myArcCosine > M_PI_4 ?  sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
-    // }
-    // if(myArcCosine > M_PI_2_3 && myArcCosine < M_PI_5_6){
-    //   //Quadrant 2
-    //   lfScaleFactor = myArcCosine > M_PI_3_4 ? sin(1.5*(myArcCosine - M_PI_3_4)): sin(-1.5*(myArcCosine - M_PI_3_4));
-    // }
   if(myArcCosine >  M_PI_4 && myArcCosine < M_PI_3_4 && myArcSin < -1*M_PI_4){
       //All Motors Reverse
       leftFrontState  = 'R';
@@ -236,14 +278,6 @@ String createDriveCommand(int yValue, int xValue){
       leftRearState   = 'R';
       rightRearState  = 'R';
   }
-    // if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3){
-    //   //Quadrant 4
-    //   lfScaleFactor = myArcCosine > M_PI_4 ? sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
-    // }
-    // if(myArcCosine > M_PI_2_3 && myArcCosine < M_PI_5_6){
-    //   //Quadrant 3
-    //   lfScaleFactor = myArcCosine > M_PI_3_4 ? sin(1.5*(myArcCosine - M_PI_3_4)): sin(-1.5*(myArcCosine - M_PI_3_4));
-    // }
   if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4 && myArcCosine > M_PI_3_4){
       //Left  Front Forward
       //Right Front Revers
@@ -254,16 +288,6 @@ String createDriveCommand(int yValue, int xValue){
       leftRearState   = 'R';
       rightRearState  = 'F';
   }
-    // if(myArcSin < M_PI_3 && myArcSin > M_PI_6 ){
-    //   //Quadrant 2
-    //   //Scale Left Front and Right Rear 
-    //   lfScaleFactor = myArcSin > M_PI_4 ? sin(1.5*(myArcSin-M_PI_4)) : sin(-1.5*(myArcSin-M_PI_4));
-    // }
-    // if(myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6) {
-    //   //Quadrant 3
-    //   //Scale Right Front and Left Rear
-    //   rfScaleFactor = myArcSin > -1*M_PI_4 ? sin(1.5*(myArcSin+M_PI_2)) : sin(-1.5*(myArcSin+M_PI_2));
-    // }
   if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4 && myArcCosine < M_PI_4){
       //Left Front Reverse
       //Right Front Forward
@@ -274,17 +298,6 @@ String createDriveCommand(int yValue, int xValue){
       leftRearState   = 'F';
       rightRearState  = 'R';
   }
-    // if(myArcSin < M_PI_3 && myArcSin > M_PI_6 ){ 
-    //   //Quadrant 1
-    //   //Scale Left Rear and Right Front 
-    //   rfScaleFactor = myArcSin > M_PI_4 ? sin(1.5*(myArcSin-M_PI_4)) : sin(-1.5*(myArcSin-M_PI_4));
-    // }
-    // if(myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6) {
-    //   //Quadrant 4
-    //   //Scale Right Rear and Left Front
-    //   lfScaleFactor = myArcSin > -1*M_PI_4 ? sin(1.5*(myArcSin+M_PI_2)) : sin(-1.5*(myArcSin+M_PI_2));
-    // }
-  
   if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3 && myArcSin < M_PI_3 && myArcSin > M_PI_6){
     //Quadrant 1
     rfScaleFactor = myArcCosine > M_PI_4 ?  sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
@@ -312,8 +325,56 @@ String createDriveCommand(int yValue, int xValue){
   motorCommand += leftRearState + calcMotorValueToHex(leftRear);
   motorCommand += rightFrontState + calcMotorValueToHex(rightFront);
   motorCommand += rightRearState + calcMotorValueToHex(rightRear);
-  Serial.println(motorCommand);
+
   return motorCommand;
+}
+
+/**
+ *  Simple averaging of the steering joystick and the movement joystick commands
+ */
+String mixSteeringAndMovement(String steeringCommand, String movementCommand){
+  String finishedMotorCommand = "";
+  char steering[steeringCommand.length()];
+  char movement[movementCommand.length()];
+  steeringCommand.toCharArray(steering, sizeof steering);
+  movementCommand.toCharArray(movement, sizeof movement);
+  for(int i =0; i<4; i++ ){
+    byte dcp = i*3; //direction char position
+    int steeringInt = 0;
+    int movementInt = 0;
+    int steeringModifier = directionModifier(steering[dcp]);
+    int movementModifier = directionModifier(movement[dcp]);
+    
+    for(int j = dcp+1; j<= dcp+2; j++){
+      steeringInt = charToHex(steering[j])<<(dcp + 2 - j);
+      movementInt = charToHex(movement[j])<<(dcp + 2 - j);
+    }
+    char newDirection = 'S';
+    float newMotorValue = (steeringModifier*steeringInt+movementModifier*movementInt)/2.0;
+    if(newMotorValue > 0){
+      newDirection = 'F';
+    }
+    if(newMotorValue < 0 ){
+      newDirection = 'R';
+    }
+
+    finishedMotorCommand += newDirection + calcMotorValueToHex(newMotorValue);
+  }
+
+  return finishedMotorCommand;
+}
+
+int directionModifier(char dir){
+  switch(dir){
+    case 0x46: //F
+      return 1;
+    case 0x52: //R
+      return -1;
+    case 0x53: //S
+    default:
+      return 0;
+
+  }
 }
 
 //ConvertFloat into two character hex.
@@ -327,6 +388,19 @@ String calcMotorValueToHex(float raw){
   return motorValInHex;
 }
 
+int charToHex(char c){
+  if(c >= 0x30 && c <= 0x39){
+    return c-0x30;
+  }
+  if(c>= 0x41 && c <= 0x46){
+    return c - 0x37;
+  }
+  if(c >= 0x61 && c<= 0x66){
+    return c-0x57;
+  }
+  return 0;
+}
+
 void readPS3Command(){
   String serialResponse = Serial3.readStringUntil('\r\n');
   // char buf [serialResponse.length()];  
@@ -334,8 +408,8 @@ void readPS3Command(){
   //debug stuff
   byte delimiter = serialResponse.indexOf(":");
 
-  String input = (serialResponse.substring(0,delimiter)).trim();
-  String inputValue = serialResponse.substring(delimiter+1).trim();
+  String input = serialResponse.substring(0,delimiter);
+  String inputValue = serialResponse.substring(delimiter+1);
   int value = inputValue.toInt();
   
   //Only Processing the commands for the sticks
@@ -357,7 +431,7 @@ void readPS3Command(){
   }
 
   if(lxReady && lyReady && rxReady && ryReady){
-    Serial2.print(createDriveCommand(lyValue, lxValue));
+    Serial2.print(createDriveCommand(lyValue, lxValue, ryValue, rxValue));
     lxReady = false;
     lyReady = false;
   }

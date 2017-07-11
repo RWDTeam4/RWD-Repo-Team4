@@ -45,6 +45,7 @@ void loop() {
 
   if (PS3.PS3Connected || PS3.PS3NavigationConnected) 
   {
+    //Always want both joystick values, ALWAYS
     if (PS3.getAnalogHat(LeftHatX) > 137 || PS3.getAnalogHat(LeftHatX) < 117 || PS3.getAnalogHat(LeftHatY) > 137 || PS3.getAnalogHat(LeftHatY) < 117 || PS3.getAnalogHat(RightHatX) > 137 || PS3.getAnalogHat(RightHatX) < 117 || PS3.getAnalogHat(RightHatY) > 137 || PS3.getAnalogHat(RightHatY) < 117) 
     {
       Serial.print(F("@LX:")); //LeftHatX
@@ -53,15 +54,17 @@ void loop() {
       Serial.print(F("@LY:")); //LeftHatY
       Serial.print(PS3.getAnalogHat(LeftHatY));
       Serial.print(endDelimiter);
-      if (PS3.PS3Connected) 
-      { // The Navigation controller only have one joystick
-        Serial.print(F("@RX:")); //RightHatX
-        Serial.print(PS3.getAnalogHat(RightHatX));
-        Serial.print(endDelimiter);
-        Serial.print(F("@RY:")); //RightHatY
-        Serial.print(PS3.getAnalogHat(RightHatY));
-        Serial.print(endDelimiter);
-      }
+      // if (PS3.PS3Connected) 
+      // { // The Navigation controller only have one joystick
+      Serial.print(F("@RX:")); //RightHatX
+      Serial.print(PS3.getAnalogHat(RightHatX));
+      Serial.print(endDelimiter);
+      Serial.print(F("@RY:")); //RightHatY
+      Serial.print(PS3.getAnalogHat(RightHatY));
+      Serial.print(endDelimiter);
+      // }
+    } else{
+      Serial.print("@LX:127\r\n@LY:127\r\n@RY:127\r\n@RX:127\r\n");
     }
 
     // Analog button values can be read from almost all buttons
