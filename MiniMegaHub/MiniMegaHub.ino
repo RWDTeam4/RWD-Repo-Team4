@@ -44,11 +44,14 @@ void setup()
   // put your setup code here, to run once:
   Serial.begin(57600);
   Serial1.begin(57600); //AC
-  Serial2.begin(115200); //MCM
+  Serial2.begin(57600); //MCM
   Serial3.begin(57600); //RF
+  Serial1.setTimeout(100);
+  Serial2.setTimeout(100);
+  Serial3.setTimeout(100);
   Serial.println("?????????");
   CMD_Readme();
-  delay(2000);
+  delay(5000);
   Serial2.println(ack);
   Serial3.println(ack);
 }
@@ -60,10 +63,10 @@ void loop()
   {
     readCMD();
   }
-  // if (Serial1.available())
-  // {
-  //   Serial.print(Serial1.readStringUntil('\r\n'));
-  // }
+   if (Serial1.available())
+   {
+     Serial.print(Serial1.readStringUntil('\r\n'));
+   }
   if(Serial2.available()){
     String mcmInput = Serial2.readStringUntil('\r\n');
     if(mcmInput.indexOf("DISABLED") >= 0){

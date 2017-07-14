@@ -13,6 +13,8 @@
 #include <SPI.h>
 #endif
 
+#define DBLE 122 //Dead Band Lower End
+#define DBUE 132 //Dead Band Upper End
 USB Usb;
 //USBHub Hub1(&Usb); // Some dongles have a hub inside
 
@@ -27,6 +29,7 @@ bool printTemperature, printAngle;
 
 void setup() {
   Serial.begin(57600);
+  Serial.setTimeout(100);
 #if !defined(__MIPSEL__)
   while (!Serial); // Wait for serial port to connect - used on Leonardo, Teensy and other boards with built-in USB CDC serial connection
 #endif
@@ -46,7 +49,7 @@ void loop() {
   if (PS3.PS3Connected || PS3.PS3NavigationConnected) 
   {
     //Always want both joystick values, ALWAYS
-    if (PS3.getAnalogHat(LeftHatX) > 137 || PS3.getAnalogHat(LeftHatX) < 117 || PS3.getAnalogHat(LeftHatY) > 137 || PS3.getAnalogHat(LeftHatY) < 117 || PS3.getAnalogHat(RightHatX) > 137 || PS3.getAnalogHat(RightHatX) < 117 || PS3.getAnalogHat(RightHatY) > 137 || PS3.getAnalogHat(RightHatY) < 117) 
+    if (PS3.getAnalogHat(LeftHatX) > DBUE || PS3.getAnalogHat(LeftHatX) < DBLE || PS3.getAnalogHat(LeftHatY) > DBUE || PS3.getAnalogHat(LeftHatY) < DBLE || PS3.getAnalogHat(RightHatX) > DBUE || PS3.getAnalogHat(RightHatX) < DBLE || PS3.getAnalogHat(RightHatY) > DBUE || PS3.getAnalogHat(RightHatY) < DBLE) 
     {
       Serial.print(F("@LX:")); //LeftHatX
       Serial.println(PS3.getAnalogHat(LeftHatX));
@@ -63,8 +66,6 @@ void loop() {
       Serial.println(PS3.getAnalogHat(RightHatY));
       // Serial.print(endDelimiter);
       // }
-    } else{
-      Serial.print("@LX:127\r\n@LY:127\r\n@RY:127\r\n@RX:127\r\n");
     }
 
     // Analog button values can be read from almost all buttons
@@ -170,10 +171,10 @@ void loop() {
     {
       Serial.print(F("Pitch: "));
       Serial.println(PS3.getAngle(Pitch));
-      Serial.print(endDelimiter);
+//      Serial.print(endDelimiter);
       Serial.print(F("Roll: "));
       Serial.println(PS3.getAngle(Roll));
-      Serial.print(endDelimiter);
+//      Serial.print(endDelimiter);
     }
 //#endif
   }
@@ -238,7 +239,7 @@ void handshake(){
   String input = "";
   while(input.indexOf("ACK") < 0){
     if(Serial.available()){
-      input = Serial.readStringUntil('\n');
+      input = Serial.readStringUntil('\r\n');
       delay(100);
     }
   }

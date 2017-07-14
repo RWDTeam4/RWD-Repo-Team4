@@ -32,7 +32,7 @@ boolean drivingM4 = false;
   
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(57600);
   initializeMcm();
   delay(100);
   handshake();
@@ -46,7 +46,9 @@ void loop()
   }
   writeCommand();
   if(enable){
+//    Serial.println("Enabled");
     if(commandReadComplete){
+      Serial.println("Command Has Been Processed");
       commandReadComplete = false;
       commandReady = false;
       motorCount = 0;
@@ -59,6 +61,7 @@ void loop()
     boolean pulseChangeM4 = currentTime - timerM4 >= dutyAmountM4;
     if(Serial.available() && !commandReady){
       incoming[charCount] = Serial.read();
+      Serial.write(incoming[charCount]);
       charCount++;
     }
     if(commandReady && !commandReadComplete){
@@ -340,3 +343,4 @@ void disableMcm() {
   PORTB &= ~B00001110; //Pins 9,10,11 Low
   motorDirection &= B00000000;  
 }
+
