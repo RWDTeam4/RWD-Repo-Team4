@@ -22,6 +22,11 @@
   #define M_PI_5_6 2.61799387799149436538
 #endif
 
+#define HubSerial Serial
+#define McmSerial Serial1
+#define RfSerial Serial2
+#define AcSerial Serial3
+#define DebugRobot 1
 
 int lyValue = 0;
 int lxValue = 0;
@@ -38,59 +43,62 @@ boolean acReady = false;
 
 String ack = "ACK";
 
-
 void setup() 
 {
   // put your setup code here, to run once:
-  Serial.begin(57600);
+  HubSerial.begin(57600);
   Serial1.begin(57600); //AC
   Serial2.begin(57600); //MCM
   Serial3.begin(57600); //RF
   Serial1.setTimeout(100);
   Serial2.setTimeout(100);
   Serial3.setTimeout(100);
-  Serial.println("?????????");
+  #ifdef DebugRobot
+  HubSerial.println("?????????");
   CMD_Readme();
+  #endif
   delay(5000);
-  Serial2.println(ack);
-  Serial3.println(ack);
+  McmSerial.println(ack);
+  RfSerial.println(ack);
 }
 
 void loop() 
 {
   // put your main code here, to run repeatedly:
-  if (Serial.available())
-  {
+  if (HubSerial.available()){
     readCMD();
   }
-   if (Serial1.available())
-   {
-     Serial.print(Serial1.readStringUntil('\r\n'));
-   }
-  if(Serial2.available()){
-    String mcmInput = Serial2.readStringUntil('\r\n');
+  if(McmSerial.available()){
+    String mcmInput = McmSerial.readStringUntil('\r\n');
     if(mcmInput.indexOf("DISABLED") >= 0){
       mcmReady = false;
     }
     if(mcmReady){
-      Serial.println(mcmInput);
+      #ifdef DebugRobot
+      HubSerial.println(mcmInput);
+      #endif
     } else {
       if(mcmInput.indexOf(ack) >= 0){
         mcmReady = true;
       } else {
-       Serial.println(mcmInput);
+       #ifdef DebugRobot
+       HubSerial.println(mcmInput);
+       #endif
       }
     }
   }
-  if (Serial3.available())
-  {
+  if (RfSerial.available()){
     if(rfReady){
       readPS3Command();
     } else {
-      String rfInput = Serial3.readStringUntil('\r\n');
+      String rfInput = RfSerial.readStringUntil('\r\n');
       if(rfInput.indexOf(ack) >= 0){
+        rfReady = true;
       } else {
-        Serial.println(rfInput);
+      
+        #ifdef DebugRobot
+        HubSerial.println(rfInput);
+        #endif
       }
     }
   }
@@ -98,12 +106,12 @@ void loop()
 
 void readCMD()
 { 
-    Serial.println("\n Serial Command Ready!");
+    HubSerial.println("\n Serial Command Ready!");
     String ModuleN = "";      
     String MCmd = "";
 
-    String inputCMD = Serial.readStringUntil('\n');
-    Serial.println(inputCMD);
+    String inputCMD = HubSerial.readStringUntil('\n');
+    HubSerial.println(inputCMD);
     for (int i =0; i< inputCMD.length(); i++)
     {
       if (inputCMD.charAt(i) == '>')
@@ -118,21 +126,21 @@ void readCMD()
         {
           MCmd+=inputCMD[j];
         }
-          Serial.print("\n [Module]: ");
-          Serial.print(ModuleN);        
-          Serial.print("\n [Command]: ");
-          Serial.print(MCmd);
-          Serial.print("]: ");
+          HubSerial.print("\n [Module]: ");
+          HubSerial.print(ModuleN);        
+          HubSerial.print("\n [Command]: ");
+          HubSerial.print(MCmd);
+          HubSerial.print("]: ");
           
           if ((ModuleN.toInt() <4) && (ModuleN.toInt() >0))
           {
             
-              Serial.print("Command OK");        
+              HubSerial.print("Command OK");        
               ModuleCMD(ModuleN.toInt(), MCmd);
           }
           else
           {
-            Serial.println("Module Channel Error!!!!");            
+            HubSerial.println("Module Channel Error!!!!");            
             CMD_Readme();            
           }
          
@@ -149,29 +157,29 @@ void ModuleCMD(int MCH, String MCMD)
     case(1):
     {
       
-      Serial.print("\n [Serial1]: ");
-      Serial.println(MCMD);
+      HubSerial.print("\n [Serial1]: ");
+      HubSerial.println(MCMD);
       Serial1.write(MCMD.c_str());
       
       break;
     }
     case(2):
     {
-      Serial.print("\n [Serial2]: ");
-      Serial.println(MCMD);
+      HubSerial.print("\n [Serial2]: ");
+      HubSerial.println(MCMD);
       Serial2.write(MCMD.c_str());
       break;
     }
     case(3):
     {
-      Serial.print("\n [Serial3]: ");
-      Serial.println(MCMD);
+      HubSerial.print("\n [Serial3]: ");
+      HubSerial.println(MCMD);
       Serial3.write(MCMD.c_str());
       break;
     }
     default:
     {
-      Serial.println("Module Selection Off Range!");
+      HubSerial.println("Module Selection Off Range!");
       break;
     }
   }
@@ -180,12 +188,12 @@ void ModuleCMD(int MCH, String MCMD)
 
 void CMD_Readme()
 {
-  Serial.println("");
-  Serial.println("Module 1 = Weapon Module");
-  Serial.println("Module 2 = Motor Module");
-  Serial.println("Module 3 = RF Module");
-  Serial.println("Input format: Module>Command ");
-  Serial.println("example= 2>0:50");
+  HubSerial.println("");
+  HubSerial.println("Module 1 = Weapon Module");
+  HubSerial.println("Module 2 = Motor Module");
+  HubSerial.println("Module 3 = RF Module");
+  HubSerial.println("Input format: Module>Command ");
+  HubSerial.println("example= 2>0:50");
 }
 
 /**
@@ -200,8 +208,6 @@ String createDriveCommand(int lyValue, int lxValue, int ryValue, int rxValue){
   movementCommand = calculateMovement(lxValue, lyValue);
 
   motorCommand = mixSteeringAndMovement(movementCommand, steeringCommand);
-  
-  Serial.println(motorCommand); //Debug Statement
   return motorCommand;
 }
 
@@ -405,10 +411,7 @@ int charToHex(char c){
 }
 
 void readPS3Command(){
-  String serialResponse = Serial3.readStringUntil('\r\n');
-  // char buf [serialResponse.length()];  
-  // serialResponse.toCharArray(buf, sizeof(buf));
-  //debug stuff
+  String serialResponse = RfSerial.readStringUntil('\r\n');
   byte delimiter = serialResponse.indexOf(":");
 
   String input = serialResponse.substring(0,delimiter);
@@ -425,8 +428,8 @@ void readPS3Command(){
     lxReady = true;
   } 
   if( input == "@RY") {
-    rxValue = value;
-    rxReady = true;
+    ryValue = value;
+    ryReady = true;
   }
   if( input == "@RX") {
     rxValue = value;
@@ -434,11 +437,15 @@ void readPS3Command(){
   }
 
   if(lxReady && lyReady && rxReady && ryReady){
-    Serial2.print(createDriveCommand(lyValue, lxValue, ryValue, rxValue));
+    String driveCommand = createDriveCommand(lyValue, lxValue, ryValue, rxValue);
+    McmSerial.print(driveCommand);
+    #ifdef DebugRobot
+    HubSerial.println(driveCommand);
+    #endif
     lxReady = false;
     lyReady = false;
+    rxReady = false;
+    ryReady = false;
   }
-  
 }
-
 
