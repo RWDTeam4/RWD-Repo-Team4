@@ -17,7 +17,7 @@ unsigned long timerM2;
 unsigned long timerM3;
 unsigned long timerM4;
 unsigned long autoTimeout;
-static unsigned long timeout = 60000000; //60 seconds
+static unsigned long timeout = 30000000; //30 seconds
 
 static unsigned short dutyLimit = 254; //Actual max value allowed
 unsigned short dutyAmountM1 = 0;
@@ -30,29 +30,26 @@ boolean drivingM2 = false;
 boolean drivingM3 = false;
 boolean drivingM4 = false;
   
-void setup()
-{
+void setup() {
   Serial.begin(57600);
   initializeMcm();
   delay(100);
   handshake();
 }
 
-void loop()
-{
+void loop(){
   currentTime = micros();
   if(currentTime - autoTimeout >= timeout) {
     disableMcm();
   }
   writeCommand();
   if(enable){
-//    Serial.println("Enabled");
     if(commandReadComplete){
-      Serial.println("Command Has Been Processed");
       commandReadComplete = false;
       commandReady = false;
       motorCount = 0;
       charCount = 0;
+      autoTimeout = micros();
     }
     commandReady = charCount >= commandLength;
     boolean pulseChangeM1 = currentTime - timerM1 >= dutyAmountM1;
@@ -343,4 +340,3 @@ void disableMcm() {
   PORTB &= ~B00001110; //Pins 9,10,11 Low
   motorDirection &= B00000000;  
 }
-
