@@ -1,5 +1,7 @@
 #include <math.h>
+#include <Servo.h>
 
+//Extra Unit Circle values used in judging boundry calculations from input
 #ifndef M_PI_6
   #define M_PI_6 0.52359877559829887307
 #endif
@@ -7,8 +9,6 @@
 #ifndef M_PI_3
   #define M_PI_3 1.04719755119659774615
 #endif
-
-//Create M_PI_2_3, M_PI_3_4, M_PI_5_6
 
 #ifndef M_PI_3_4
   #define M_PI_3_4 2.35619449019234492884
@@ -22,125 +22,170 @@
   #define M_PI_5_6 2.61799387799149436538
 #endif
 
-#define HubSerial Serial
-#define McmSerial Serial1
-#define RfSerial Serial2
-#define AcSerial Serial3
-#define DebugRobot 1
+//Quick way to replace what Serial channel a module is using
+#define MASTER_MODULE_SERIAL Serial
+#define MOTOR_CONTROL_SERIAL Serial1
+#define BLUETOOTH_SERIAL Serial2
+#define NOT_USED Serial3
 
-int lyValue = 0;
-int lxValue = 0;
-int ryValue = 0;
-int rxValue = 0;
+//Comment out line below to remove debug statements (will speed up processing overall)
+#define DEBUG_ROBOT 1
+
+#define DBLE 120 //Dead Band Lower End
+#define DBUE 135 //Dead Band Upper End
+#define STICK_CENTER 127.5 //Dead Center of Stick Values
+
+unsigned long commandTimer = 0;
+unsigned long currentTime = 0;
+
+//Bluetooth To Motor Control Variables
+float lyValue = 0;
+float lxValue = 0;
+float ryValue = 0;
+float rxValue = 0;
+
 boolean commandReady = false;
 boolean lxReady = false;
 boolean lyReady = false;
 boolean rxReady = false;
 boolean ryReady = false;
+
 boolean mcmReady = false;
 boolean rfReady = false;
 boolean acReady = false;
+
+//Servo & AC Variables
+int ACMotor_MAX = 180;
+int Limit_MAX = 255;
+int Limit_MIN = 0;
+int Stepping = 300;
+
+int DAC_OUT1 = 2;
+int SERVO_OUT1 = 4;
+
+int ADC_PWM = 255;
+
+Servo servo1;
+
+boolean acSpinUp = false;
+boolean engageClutch = false;
 
 String ack = "ACK";
 
 void setup() 
 {
+
+  servo1.attach(SERVO_OUT1,550,2370);
+  
   // put your setup code here, to run once:
-  HubSerial.begin(57600);
-  Serial1.begin(57600); //AC
-  Serial2.begin(57600); //MCM
-  Serial3.begin(57600); //RF
+  MASTER_MODULE_SERIAL.begin(57600);
+  Serial1.begin(57600); 
+  Serial2.begin(57600); 
+  Serial3.begin(57600); 
   Serial1.setTimeout(100);
   Serial2.setTimeout(100);
   Serial3.setTimeout(100);
-  #ifdef DebugRobot
-  HubSerial.println("?????????");
+  #ifdef DEBUG_ROBOT
+  MASTER_MODULE_SERIAL.println("?????????");
   CMD_Readme();
+  MASTER_MODULE_SERIAL.println("Starting Servo...."); 
   #endif
+  
+  
+  pinMode(DAC_OUT1, OUTPUT);
+  DAC_Conversion(255,DAC_OUT1);
+  delay(1000);
+  servoInitialization();
+  
+  
   delay(5000);
-  McmSerial.println(ack);
-  RfSerial.println(ack);
+
+  resetMotorCommand();
+  
+  MOTOR_CONTROL_SERIAL.println(ack);
+  BLUETOOTH_SERIAL.println(ack);
 }
 
 void loop() 
 {
+  currentTime = micros();
   // put your main code here, to run repeatedly:
-  if (HubSerial.available()){
-    readCMD();
+  if(currentTime - commandTimer >= 5000000){
+    resetMotorCommand();
   }
-  if(McmSerial.available()){
-    String mcmInput = McmSerial.readStringUntil('\r\n');
+  #ifdef DEBUG_ROBOT
+    if (MASTER_MODULE_SERIAL.available()){
+      readCMD();
+    }
+  #endif
+  if(MOTOR_CONTROL_SERIAL.available()){
+    String mcmInput = MOTOR_CONTROL_SERIAL.readStringUntil('\r\n');
     if(mcmInput.indexOf("DISABLED") >= 0){
       mcmReady = false;
     }
     if(mcmReady){
-      #ifdef DebugRobot
-      HubSerial.println(mcmInput);
+      #ifdef DEBUG_ROBOT
+      MASTER_MODULE_SERIAL.println(mcmInput);
       #endif
     } else {
       if(mcmInput.indexOf(ack) >= 0){
         mcmReady = true;
       } else {
-       #ifdef DebugRobot
-       HubSerial.println(mcmInput);
+       #ifdef DEBUG_ROBOT
+       MASTER_MODULE_SERIAL.println(mcmInput);
        #endif
       }
     }
   }
-  if (RfSerial.available()){
+  if (BLUETOOTH_SERIAL.available()){
     if(rfReady){
       readPS3Command();
     } else {
-      String rfInput = RfSerial.readStringUntil('\r\n');
+      String rfInput = BLUETOOTH_SERIAL.readStringUntil('\r\n');
       if(rfInput.indexOf(ack) >= 0){
         rfReady = true;
       } else {
       
-        #ifdef DebugRobot
-        HubSerial.println(rfInput);
+        #ifdef DEBUG_ROBOT
+        MASTER_MODULE_SERIAL.println(rfInput);
         #endif
       }
     }
   }
 }
 
-void readCMD()
-{ 
-    HubSerial.println("\n Serial Command Ready!");
-    String ModuleN = "";      
+#ifdef DEBUG_ROBOT
+void readCMD(){ 
+    MASTER_MODULE_SERIAL.println("\n Serial Command Ready!");
+    String ModuleN = "";
+    int moduleNumber = -1;      
     String MCmd = "";
 
-    String inputCMD = HubSerial.readStringUntil('\n');
-    HubSerial.println(inputCMD);
-    for (int i =0; i< inputCMD.length(); i++)
-    {
-      if (inputCMD.charAt(i) == '>')
-      {
+    String inputCMD = MASTER_MODULE_SERIAL.readStringUntil('\n');
+    MASTER_MODULE_SERIAL.println(inputCMD);
+    for (int i =0; i< inputCMD.length(); i++){
+      if (inputCMD.charAt(i) == '>'){
 
-        for (int j = 0;j < i;j++)
-        {
-
+        for (int j = 0;j < i;j++){
           ModuleN+=inputCMD[j];
         }
-        for (int j = i+1;j<inputCMD.length()+1; j++)
-        {
+        moduleNumber = ModuleN.toInt();
+        for (int j = i+1;j<inputCMD.length()+1; j++){
           MCmd+=inputCMD[j];
         }
-          HubSerial.print("\n [Module]: ");
-          HubSerial.print(ModuleN);        
-          HubSerial.print("\n [Command]: ");
-          HubSerial.print(MCmd);
-          HubSerial.print("]: ");
+          MASTER_MODULE_SERIAL.print("\n [Module]: ");
+          MASTER_MODULE_SERIAL.print(ModuleN);        
+          MASTER_MODULE_SERIAL.print("\n [Command]: ");
+          MASTER_MODULE_SERIAL.print(MCmd);
+          MASTER_MODULE_SERIAL.print("]: ");
           
-          if ((ModuleN.toInt() <4) && (ModuleN.toInt() >0))
-          {
-            
-              HubSerial.print("Command OK");        
-              ModuleCMD(ModuleN.toInt(), MCmd);
+          if ((moduleNumber <5) && (moduleNumber >0)){
+              MASTER_MODULE_SERIAL.print("Command OK");        
+              ModuleCMD(moduleNumber, MCmd);
           }
           else
           {
-            HubSerial.println("Module Channel Error!!!!");            
+            MASTER_MODULE_SERIAL.println("Module Channel Error!!!!");            
             CMD_Readme();            
           }
          
@@ -148,53 +193,61 @@ void readCMD()
     }
 }
 
-void ModuleCMD(int MCH, String MCMD)
-{
+void ModuleCMD(int MCH, String MCMD){
   //char buffer[MCMD.length()+1];
   //sprint(buffer, MCMD);
-  switch(MCH)
-  {
+  switch(MCH){
     case(1):
     {
-      
-      HubSerial.print("\n [Serial1]: ");
-      HubSerial.println(MCMD);
+      MASTER_MODULE_SERIAL.print("\n [Serial1]: ");
+      MASTER_MODULE_SERIAL.println(MCMD);
       Serial1.write(MCMD.c_str());
       
       break;
     }
     case(2):
     {
-      HubSerial.print("\n [Serial2]: ");
-      HubSerial.println(MCMD);
+      MASTER_MODULE_SERIAL.print("\n [Serial2]: ");
+      MASTER_MODULE_SERIAL.println(MCMD);
       Serial2.write(MCMD.c_str());
       break;
     }
     case(3):
     {
-      HubSerial.print("\n [Serial3]: ");
-      HubSerial.println(MCMD);
+      MASTER_MODULE_SERIAL.print("\n [Serial3]: ");
+      MASTER_MODULE_SERIAL.println(MCMD);
       Serial3.write(MCMD.c_str());
       break;
     }
+    case(4):
+    {
+      ADC_PWM = MCMD.toInt();
+      if(ADC_PWM < 256 && ADC_PWM > -1){
+        DAC_Conversion(ADC_PWM, DAC_OUT1);
+      } else {
+        MASTER_MODULE_SERIAL.println("AC Motor Input Value Out Of Range!");
+      }
+    }
     default:
     {
-      HubSerial.println("Module Selection Off Range!");
+      MASTER_MODULE_SERIAL.println("Module Selection Out Of Range!");
       break;
     }
   }
 }
 
 
-void CMD_Readme()
-{
-  HubSerial.println("");
-  HubSerial.println("Module 1 = Weapon Module");
-  HubSerial.println("Module 2 = Motor Module");
-  HubSerial.println("Module 3 = RF Module");
-  HubSerial.println("Input format: Module>Command ");
-  HubSerial.println("example= 2>0:50");
+void CMD_Readme(){
+  MASTER_MODULE_SERIAL.println("");
+  MASTER_MODULE_SERIAL.println("Module 1 = Weapon Module");
+  MASTER_MODULE_SERIAL.println("Module 2 = Motor Module");
+  MASTER_MODULE_SERIAL.println("Module 3 = RF Module");
+  MASTER_MODULE_SERIAL.println("Module 4 = AC Clutch Spinup");
+  MASTER_MODULE_SERIAL.println("Input format: Module>Command ");
+  MASTER_MODULE_SERIAL.println("example= 2>0:50");
 }
+#endif
+
 
 /**
  *  Using Joystick values, creates the command to be sent to the Motor Control Module
@@ -214,19 +267,19 @@ String createDriveCommand(int lyValue, int lxValue, int ryValue, int rxValue){
 /**
  *  Only uses the x axis value to judge whether you're stearing left or right
  */
-String calculateSteering(int rxValue, int ryValue) {
+String calculateSteering(float rxValue, float ryValue){
   String motorCommand = "";
   char leftFrontState = 'S';
   char rightFrontState = 'S';
   char leftRearState = 'S';
   char rightRearState = 'S';
-  if(rxValue > 127.5){
+  if(rxValue > STICK_CENTER){
     leftFrontState = 'F';
     leftRearState = 'F';
     rightFrontState = 'R';
     rightRearState = 'R';
   } 
-  if(rxValue < 127.5){
+  if(rxValue < STICK_CENTER){
     leftFrontState = 'R';
     leftRearState = 'R';
     rightFrontState = 'F';
@@ -246,19 +299,19 @@ String calculateSteering(int rxValue, int ryValue) {
 /**
  *  Basic Mecanum movement, derives motor values based on angles and directional ma
  */
-String calculateMovement(int lxValue, int lyValue){
+String calculateMovement(float xVal, float yVal){
   
   String motorCommand = "";
 
-  float inLy = 127.5 - lyValue;
-  float inLx = lxValue - 127.5;
-  inLy = inLy >= 127.5 ? 127.5 : inLy;
-  inLx = inLx >= 127.5 ? 127.5 : inLx;
-  inLy = inLy <= -127.5 ? -127.5 : inLy;
-  inLx = inLx <= -127.5 ? -127.5 : inLx;
-  float magnitude = sqrt(sq(inLy) + sq(inLx));
-  float myArcSin = asin(inLy/magnitude);
-  float myArcCosine = acos(inLx/magnitude);
+  float inY = STICK_CENTER - yVal;
+  float inX = xVal - STICK_CENTER;
+  inY = inY >= STICK_CENTER ? STICK_CENTER : inY;
+  inX = inX >= STICK_CENTER ? STICK_CENTER : inX;
+  inY = inY <= -STICK_CENTER ? -STICK_CENTER : inY;
+  inX = inX <= -STICK_CENTER ? -STICK_CENTER : inX;
+  float magnitude = sqrt(sq(inY) + sq(inX));
+  float myArcSin = asin(inY/magnitude);
+  float myArcCosine = acos(inX/magnitude);
   char leftFrontState = 'S';
   char rightFrontState = 'S';
   char leftRearState = 'S';
@@ -280,14 +333,14 @@ String calculateMovement(int lxValue, int lyValue){
     leftRearState   = 'F';
     rightRearState  = 'F';
   }
-  if(myArcCosine >  M_PI_4 && myArcCosine < M_PI_3_4 && myArcSin < -1*M_PI_4){
+  if(myArcCosine >  M_PI_4 && myArcCosine < M_PI_3_4 && myArcSin < -M_PI_4){
       //All Motors Reverse
       leftFrontState  = 'R';
       rightFrontState = 'R';
       leftRearState   = 'R';
       rightRearState  = 'R';
   }
-  if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4 && myArcCosine > M_PI_3_4){
+  if(myArcSin > -M_PI_4 && myArcSin < M_PI_4 && myArcCosine > M_PI_3_4){
       //Left  Front Forward
       //Right Front Revers
       //Left  Rear  Reverse
@@ -297,7 +350,7 @@ String calculateMovement(int lxValue, int lyValue){
       leftRearState   = 'R';
       rightRearState  = 'F';
   }
-  if(myArcSin > -1*M_PI_4 && myArcSin < M_PI_4 && myArcCosine < M_PI_4){
+  if(myArcSin > -M_PI_4 && myArcSin < M_PI_4 && myArcCosine < M_PI_4){
       //Left Front Reverse
       //Right Front Forward
       //Left Rear Forward
@@ -315,11 +368,11 @@ String calculateMovement(int lxValue, int lyValue){
     //Quadrant 2
     lfScaleFactor = myArcCosine > M_PI_3_4 ? sin(1.5*(myArcCosine - M_PI_3_4)): sin(-1.5*(myArcCosine - M_PI_3_4));
   }
-  if(myArcCosine > M_PI_2_3 && myArcCosine < M_PI_5_6 && myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6){
+  if(myArcCosine > M_PI_2_3 && myArcCosine < M_PI_5_6 && myArcSin > -M_PI_3 && myArcSin < -M_PI_6){
     //Quadrant 3
     rfScaleFactor = myArcCosine > M_PI_3_4 ? sin(1.5*(myArcCosine - M_PI_3_4)): sin(-1.5*(myArcCosine - M_PI_3_4));
   }
-  if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3 && myArcSin > -1*M_PI_3 && myArcSin < -1*M_PI_6){
+  if(myArcCosine > M_PI_6 && myArcCosine < M_PI_3 && myArcSin > -M_PI_3 && myArcSin < -M_PI_6){
     //Quadrant 4
     lfScaleFactor = myArcCosine > M_PI_4 ? sin(1.5*(myArcCosine - M_PI_4)): sin(-1.5*(myArcCosine - M_PI_4));
   }
@@ -375,20 +428,19 @@ String mixSteeringAndMovement(String steeringCommand, String movementCommand){
 
 int directionModifier(char dir){
   switch(dir){
-    case 0x46: //F
+    case 0x46: //F => Forward
       return 1;
-    case 0x52: //R
+    case 0x52: //R => Reverse
       return -1;
-    case 0x53: //S
-    default:
+    case 0x53: //S => Stop
+    default:   //Any garbage that tries to get in
       return 0;
-
   }
 }
 
 //ConvertFloat into two character hex.
 String calcMotorValueToHex(float raw){
-  int rawInt = (int) ((raw/127.0)*255.0);
+  int rawInt = (int) ((raw/STICK_CENTER)*255.0);
   rawInt = rawInt > 255 ? 255 : rawInt;
   String motorValInHex = String(rawInt, HEX);
   if(rawInt <= 0xF){
@@ -410,37 +462,73 @@ int charToHex(char c){
   return 0;
 }
 
+void resetMotorCommand(){
+  lxValue = lyValue = rxValue = ryValue = STICK_CENTER;
+  lxReady = lyReady = rxReady = ryReady = false;
+  commandTimer = micros();
+  String stopMotors = "S00S00S00S00";
+  MOTOR_CONTROL_SERIAL.print(stopMotors);
+}
+
 void readPS3Command(){
-  String serialResponse = RfSerial.readStringUntil('\r\n');
+  String serialResponse = BLUETOOTH_SERIAL.readStringUntil('\r\n');
   byte delimiter = serialResponse.indexOf(":");
 
   String input = serialResponse.substring(0,delimiter);
   String inputValue = serialResponse.substring(delimiter+1);
-  int value = inputValue.toInt();
+  float value = inputValue.toFloat();
+
+  //Required Dead Band Check
+  if(value >= DBLE && value <= DBUE){
+    value = STICK_CENTER;
+  }
   
   //Only Processing the commands for the sticks
   if(input == "@LY"){
      lyValue = value;
      lyReady = true;
   }
-  if( input == "@LX") {
+  if( input == "@LX"){
     lxValue = value;
     lxReady = true;
   } 
-  if( input == "@RY") {
+  if( input == "@RY"){
     ryValue = value;
     ryReady = true;
   }
-  if( input == "@RX") {
+  if( input == "@RX"){
     rxValue = value;
     rxReady = true;
   }
 
+  if( input == "@SS" ){
+//    if(!acSpinUp){
+//      acSpinUp = true;
+//      DAC_Conversion(ADC_PWM, DAC_OUT1);
+//    } else {
+//      acSpinUp = false;
+//      DAC_Conversion(ADC_PWM, DAC_OUT1);
+//    }
+  }
+
+  if(input == "@TT"){
+    // engageDogClutch
+  }
+  if(input == "@R1"){
+    //Increase ADC_PWM value and cut off at upper limit
+    ADC_PWM = ADC_PWM + 10 <= ACMotor_MAX ? ADC_PWM + 10 : ACMotor_MAX;
+  }
+  if(input == "@L1"){
+    //Decrease ADC_PWM value and cut off at lower limit
+    ADC_PWM = ADC_PWM - 10 <= 0 ? ADC_PWM - 10 : 0;
+  }
+
   if(lxReady && lyReady && rxReady && ryReady){
+    commandTimer = micros();
     String driveCommand = createDriveCommand(lyValue, lxValue, ryValue, rxValue);
-    McmSerial.print(driveCommand);
-    #ifdef DebugRobot
-    HubSerial.println(driveCommand);
+    MOTOR_CONTROL_SERIAL.print(driveCommand);
+    #ifdef DEBUG_ROBOT
+    MASTER_MODULE_SERIAL.println(driveCommand);
     #endif
     lxReady = false;
     lyReady = false;
@@ -448,4 +536,39 @@ void readPS3Command(){
     ryReady = false;
   }
 }
+
+void RAMP_UP (int NOW, int MAX,  int PIN){
+  ADC_PWM = 10;
+  DAC_Conversion(10, DAC_OUT1);
+}
+
+void RAMP_DOWN (int NOW, int MIN,  int PIN){
+  for(NOW; NOW > MIN; NOW++){
+    delay(100);
+    DAC_Conversion(NOW, DAC_OUT1);
+    Serial.println(NOW);  
+  }
+  ADC_PWM = MIN;
+}
+
+void servoInitialization(){
+  Serial.println("Initialization Of DAC Unit Started....");
+  DAC_Conversion(255,DAC_OUT1);
+  Servo_Action(0);
+  delay(200);
+  ADC_PWM = 0;
+  DAC_Conversion(ADC_PWM, DAC_OUT1);
+  Serial.println("DAC Unit READY!!!");
+}
+
+void DAC_Conversion(int PWM, int PIN){
+  analogWrite(PIN, PWM);
+  Servo_Action(PWM);
+}
+
+void Servo_Action(int PWMValue){
+  int val = map(PWMValue, Limit_MIN, Limit_MAX,0,180);
+  servo1.write(val);
+}
+
 

@@ -13,8 +13,8 @@
 #include <SPI.h>
 #endif
 
-#define DBLE 122 //Dead Band Lower End
-#define DBUE 132 //Dead Band Upper End
+//#define DBLE 122 //Dead Band Lower End
+//#define DBUE 132 //Dead Band Upper End
 USB Usb;
 //USBHub Hub1(&Usb); // Some dongles have a hub inside
 
