@@ -110,7 +110,7 @@ void loop()
   currentTime = micros();
   // put your main code here, to run repeatedly:
   if(currentTime - commandTimer >= 5000000){
-    resetMotorCommand();
+    MOTOR_CONTROL_SERIAL.print(resetMotorCommand());
   }
   #ifdef DEBUG_ROBOT
     if (MASTER_MODULE_SERIAL.available()){
@@ -200,8 +200,6 @@ void readCMD(){
 }
 
 void ModuleCMD(int MCH, String MCMD){
-  //char buffer[MCMD.length()+1];
-  //sprint(buffer, MCMD);
   switch(MCH){
     case(1):
     {
@@ -468,12 +466,12 @@ int charToHex(char c){
   return 0;
 }
 
-void resetMotorCommand(){
+String resetMotorCommand(){
   lxValue = lyValue = rxValue = ryValue = STICK_CENTER;
   lxReady = lyReady = rxReady = ryReady = false;
   commandTimer = micros();
   String stopMotors = "S00S00S00S00";
-  MOTOR_CONTROL_SERIAL.print(stopMotors);
+  return stopMotors;
 }
 
 void readPS3Command(){
@@ -508,17 +506,18 @@ void readPS3Command(){
   }
 
   if( input == "@SS" ){
-//    if(!acSpinUp){
-//      acSpinUp = true;
-//      DAC_Conversion(ADC_PWM, DAC_OUT1);
-//    } else {
-//      acSpinUp = false;
-//      DAC_Conversion(ADC_PWM, DAC_OUT1);
-//    }
+    if(!acSpinUp){
+      acSpinUp = true;
+      DAC_Conversion(ADC_PWM, DAC_OUT1);
+    } else {
+      acSpinUp = false;
+      DAC_Conversion(ADC_PWM, DAC_OUT1);
+    }
   }
 
   if(input == "@TT"){
     // engageDogClutch
+    //Need to figure out process for disengagingn dog clutch when the weapon is fired
   }
   if(input == "@R1"){
     //Increase ADC_PWM value and cut off at upper limit
@@ -531,7 +530,18 @@ void readPS3Command(){
 
   if(lxReady && lyReady && rxReady && ryReady){
     commandTimer = micros();
-    String driveCommand = createDriveCommand(lyValue, lxValue, ryValue, rxValue);
+    String driveCommand = "";
+    boolean leftStickInDeadband = lyValue > DBLE && lyValue < DBUE && lxValue > DBLE && lxValue < DBUE;
+    boolean rightStickInDeadband = ryValue > DBLE && ryValue < DBUE && rxValue > DBLE && rxValue < DBUE;
+    if( !leftStickInDeadband && !rightStickInDeadband ){
+      driveCommand = createDriveCommand(lyValue, lxValue, ryValue, rxValue); 
+    }else if( leftStickInDeadband && !rightStickInDeadband){
+      driveCommand = calculateSteering(rxValue, ryValue);
+    }else if( !leftStickInDeadband && rightStickInDeadband) {
+      driveCommand = calculateMovement(lxValue, lyValue);
+    }else{
+      driveCommand = resetMotorCommand();
+    }
     MOTOR_CONTROL_SERIAL.print(driveCommand);
     #ifdef DEBUG_ROBOT
     MASTER_MODULE_SERIAL.println(driveCommand);
@@ -580,5 +590,3 @@ void Servo_Action(int PWMValue){
   int val = map(PWMValue, Limit_MIN, Limit_MAX,0,180);
   servo1.write(val);
 }
-
-
