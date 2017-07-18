@@ -290,7 +290,7 @@ String calculateSteering(float rxValue, float ryValue){
     rightRearState = 'F';
   }
 
-  float motorIntensityRaw = (rxValue / 127.0) * 255.0;
+  float motorIntensityRaw = (rxValue / STICK_CENTER) * 255.0;
   motorIntensityRaw = motorIntensityRaw > 255.0 ? 255.0 : motorIntensityRaw; //Cap this value
   String motorIntensityString = calcMotorValueToHex(motorIntensityRaw);
 
