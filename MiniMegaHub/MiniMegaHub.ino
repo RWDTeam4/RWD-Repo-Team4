@@ -72,8 +72,7 @@ boolean engageClutch = false;
 
 String ack = "ACK";
 
-void setup() 
-{
+void setup() {
 
   servo1.attach(SERVO_OUT1,550,2370);
   
@@ -129,7 +128,11 @@ void loop()
       #endif
     } else {
       if(mcmInput.indexOf(ack) >= 0){
+        #ifdef DEBUG_ROBOT
+        MASTER_MODULE_SERIAL.println("Motor Control Module ACK Recieved");
+        #endif
         mcmReady = true;
+        
       } else {
        #ifdef DEBUG_ROBOT
        MASTER_MODULE_SERIAL.println(mcmInput);
@@ -143,6 +146,9 @@ void loop()
     } else {
       String rfInput = BLUETOOTH_SERIAL.readStringUntil('\r\n');
       if(rfInput.indexOf(ack) >= 0){
+        #ifdef DEBUG_ROBOT
+        MASTER_MODULE_SERIAL.println("Bluetooth Module ACK Recieved");
+        #endif
         rfReady = true;
       } else {
       
@@ -552,13 +558,17 @@ void RAMP_DOWN (int NOW, int MIN,  int PIN){
 }
 
 void servoInitialization(){
-  Serial.println("Initialization Of DAC Unit Started....");
+  #ifdef DEBUG_ROBOT
+  MASTER_MODULE_SERIAL.println("Initialization Of DAC Unit Started....");
+  #endif
   DAC_Conversion(255,DAC_OUT1);
   Servo_Action(0);
   delay(200);
   ADC_PWM = 0;
   DAC_Conversion(ADC_PWM, DAC_OUT1);
-  Serial.println("DAC Unit READY!!!");
+  #ifdef DEBUG_ROBOT
+  MASTER_MODULE_SERIAL.println("DAC Unit READY!!!");
+  #endif
 }
 
 void DAC_Conversion(int PWM, int PIN){
