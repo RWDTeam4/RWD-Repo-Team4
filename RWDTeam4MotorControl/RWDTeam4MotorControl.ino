@@ -1,15 +1,14 @@
 static String ack = "ACK";  
 
-char incoming[12] = "";
+
 byte charCount = 0;
 byte motorCount = 0;
 byte motorDirection = B00000000;
 long command = 0x0;
 boolean enable = true;
 unsigned long currentTime;
-static byte commandLength = 12; //Total Length of command
+static byte commandLength = 15; //Total Length of command
 static byte subCommandLength = 3;
-boolean commandReadComplete = false;
 boolean commandReady = false;
 
 unsigned long timerM1;
@@ -17,7 +16,7 @@ unsigned long timerM2;
 unsigned long timerM3;
 unsigned long timerM4;
 unsigned long autoTimeout;
-static unsigned long timeout = 30000000; //30 seconds
+static unsigned long timeout = 30000; //30 seconds
 
 static unsigned short dutyLimit = 254; //Actual max value allowed
 unsigned short dutyAmountM1 = 0;
@@ -38,200 +37,123 @@ void setup() {
 }
 
 void loop(){
-  currentTime = micros();
+  currentTime = millis();
   if(currentTime - autoTimeout >= timeout) {
     disableMcm();
   }
-  writeCommand();
   if(enable){
-    if(commandReadComplete){
-      commandReadComplete = false;
-      commandReady = false;
-      motorCount = 0;
-      charCount = 0;
-      autoTimeout = micros();
+    char serialCommandCharArray[commandLength] = "";
+    if(Serial.available()){
+      String serialCommand = Serial.readStringUntil('\r\n');
+      Serial.println(serialCommand);
+      serialCommand.toCharArray(serialCommandCharArray, sizeof(serialCommandCharArray));
+      commandReady = true;
+      autoTimeout = millis();
     }
-    commandReady = charCount >= commandLength;
-    boolean pulseChangeM1 = currentTime - timerM1 >= dutyAmountM1;
-    boolean pulseChangeM2 = currentTime - timerM2 >= dutyAmountM2;
-    boolean pulseChangeM3 = currentTime - timerM3 >= dutyAmountM3;
-    boolean pulseChangeM4 = currentTime - timerM4 >= dutyAmountM4;
-    if(Serial.available() && !commandReady){
-      incoming[charCount] = Serial.read();
-      Serial.write(incoming[charCount]);
-      charCount++;
-    }
-    if(commandReady && !commandReadComplete){
-      unsigned int dutyAmount = 0;
-      byte directionChar = motorCount*subCommandLength;
-      command = incoming[directionChar];
-      for(int i = directionChar+1; i< directionChar+subCommandLength; i++){
-        dutyAmount += charToHex(incoming[i])<<(((directionChar+2)-i)*4);
-      }
+    if(commandReady){
+      for(int i =0; i<4; i++ ){
+        byte dcp = i*subCommandLength;
+        command = serialCommandCharArray[dcp];
+        int dutyAmount = 0;
+        for(int j = dcp+1; j<= dcp+2; j++){
+          dutyAmount += charToHex(serialCommandCharArray[j])<<(((dcp+2)-j)*4);
+        }
 
-      if(dutyAmount>dutyLimit){
-        dutyAmount = dutyLimit;
-      }
-      switch(motorCount){
-        case 0:
-          dutyAmountM1 = dutyAmount;
-          break;
-        case 1:
-          dutyAmountM2 = dutyAmount;
-          break;
-        case 2:
-          dutyAmountM3 = dutyAmount;
-          break;
-        case 3:
-          dutyAmountM4 = dutyAmount;
-          commandReadComplete = true;
-          break;
-      }
-      motorCount++;
-    }
+        if(dutyAmount>dutyLimit){
+          dutyAmount = dutyLimit;
+        }
+        switch(command<<i){
+          case 0x44: //D
+          case 0x64: //d
+          case 0x88:
+          case 0xc8:
+          case 0x110:
+          case 0x190:
+          case 0x220:
+          case 0x320:
+            disableMcm();
+            break;
     
-    switch(command<<motorCount){
-      case 0x44: //D
-      case 0x64: //d
-      case 0x88:
-      case 0xc8:
-      case 0x110:
-      case 0x190:
-      case 0x220:
-      case 0x320:
-        disableMcm();
-        break;
-
-      case 0x46: //F Motor 1
-      case 0x66: //f Motor 1
-        timerM1 = micros();
-        PORTD &= ~B01000000;
-        motorDirection |= B00000001;
-        motorDirection &= ~B00000010;
-        pulseChangeM1 = false; // Set to false to prevent instant forward to reverse
-        drivingM1 = true;
-        command = 0x0;
-        break;
-      case 0x8c : //F Motor 2
-      case 0xcc : //f Motor 2
-      	timerM2 = micros();
-      	PORTB &= ~B00000010;
-        motorDirection |= B00000100;
-        motorDirection &= ~B00001000;
-      	pulseChangeM2 = false;
-      	drivingM2 = true;
-      	command = 0x0;
-      	break;
-      case 0x118 : //F Motor 3
-      case 0x198 : //f Motor 3
-      	timerM3 = micros();
-      	PORTB &= ~B00000100;
-        motorDirection |= B00100000;
-        motorDirection &= ~B00010000;
-      	pulseChangeM3 = false;
-      	drivingM3 = true;
-      	command = 0x0;
-      case 0x230 : //F Motor 4
-      case 0x330 : //f Motor 4
-      	timerM4 = micros();
-      	PORTB &= ~B00001000;
-        motorDirection |= B10000000;
-        motorDirection &= ~B01000000;
-      	pulseChangeM4 = false;
-      	drivingM4 = true;
-      	command = 0x0;
-      	break;
-
-      case 0x52: //R Motor 1
-      case 0x72: //r Motor 1
-        //Reverse Stuff
-        timerM1 = micros();
-        PORTD &= ~B01000000;
-        motorDirection |= B00000010;
-        motorDirection &= ~B00000001;
-        pulseChangeM1 = false; // Set to false to prevent instant forward to reverse
-        drivingM1 = true;
-        command = 0x0;
-        break;
-      case 0xa4: //R Motor 2
-      case 0xe4: //r Motor 2
-        timerM2 = micros();
-        PORTB &= ~B00000010;
-        motorDirection |= B00001000;
-        motorDirection &= ~B00000100;
-        pulseChangeM2 = false;
-        drivingM2 = true;
-        command = 0x0;
-        break;
-      case 0x148: //R Motor 3
-      case 0x1c8: //r Motor 3
-        timerM3 = micros();
-        PORTB &= ~B00000100;
-        motorDirection |= B00010000;
-        motorDirection &= ~B00100000;
-        pulseChangeM3 = false;
-        drivingM3 = true;
-        command = 0x0;
-        break;
-      case 0x290: //R Motor 4
-      case 0x390: //r Motor 4
-        timerM4 = micros();
-        PORTB &= ~B00001000;
-        motorDirection |= B01000000;
-        motorDirection &= ~B10000000;
-        pulseChangeM4 = false;
-        drivingM4 = true;
-        command = 0x0;
-        break;
-
-      case 0x53: //S  Stops the motor (turns all ports to digital low)
-      case 0x73: //s
-        PORTD &= ~B01000000;
-        motorDirection &= B11111100;
-        drivingM1 = false;
-        break;
-      case 0xa6: //S  Stops the motor (turns all ports to digital low)
-      case 0xe6: //s
-        PORTD &= ~B01000000;
-        motorDirection &= B11110011;
-        drivingM2 = false;
-        break;
-      case 0x14c: //S  Stops the motor (turns all ports to digital low)
-      case 0x1cc: //s
-        PORTD &= ~B01000000;
-        motorDirection &= B11001111;
-        drivingM3 = false;
-        break;
-      case 0x298: //S  Stops the motor (turns all ports to digital low)
-      case 0x398: //s
-        PORTD &= ~B01000000;
-        motorDirection &= B00111111;
-        drivingM4 = false;
-        break;
-      default: //Unhandled Command
-        break; 
-    }
+          case 0x46: //F Motor 1
+          case 0x66: //f Motor 1
+            analogWrite(6, dutyAmount);
+            motorDirection |= B00000001;
+            motorDirection &= ~B00000010;
+            break;
+          case 0x8c : //F Motor 2
+          case 0xcc : //f Motor 2
+            analogWrite(9, dutyAmount);
+            motorDirection |= B00000100;
+            motorDirection &= ~B00001000;
+          	break;
+          case 0x118 : //F Motor 3
+          case 0x198 : //f Motor 3
+            analogWrite(10, dutyAmount);
+            motorDirection |= B00100000;
+            motorDirection &= ~B00010000;
+          case 0x230 : //F Motor 4
+          case 0x330 : //f Motor 4
+            analogWrite(11, dutyAmount);
+            motorDirection |= B10000000;
+            motorDirection &= ~B01000000;
+          	break;
     
-	  if(pulseChangeM1 && drivingM1){
-	    dutyAmountM1 = 255 - dutyAmountM1;
-	    PORTD ^= B01000000; 
-	    timerM1 = micros();
-	  }
-	  if(pulseChangeM2 && drivingM2){
-	    dutyAmountM2 = 255 - dutyAmountM2;
-	    PORTB ^= B00000010;
-	    timerM2 = micros();
-	  }
-	  if(pulseChangeM3 && drivingM3){
-	    dutyAmountM3 = 255 - dutyAmountM3;
-	    PORTB ^= B00000100; 
-	    timerM3 = micros();
-	  }
-	  if(pulseChangeM4 && drivingM4){
-	    dutyAmountM4 = 255 - dutyAmountM4;
-	    PORTB ^= B00001000; 
-	    timerM4 = micros();
-	  }
+          case 0x52: //R Motor 1
+          case 0x72: //r Motor 1
+            //Reverse Stuff
+            analogWrite(6, dutyAmount);
+            motorDirection |= B00000010;
+            motorDirection &= ~B00000001;
+            break;
+          case 0xa4: //R Motor 2
+          case 0xe4: //r Motor 2
+            analogWrite(9, dutyAmount);
+            motorDirection |= B00001000;
+            motorDirection &= ~B00000100;
+            break;
+          case 0x148: //R Motor 3
+          case 0x1c8: //r Motor 3
+            analogWrite(10, dutyAmount);
+            motorDirection |= B00010000;
+            motorDirection &= ~B00100000;
+            break;
+          case 0x290: //R Motor 4
+          case 0x390: //r Motor 4
+            analogWrite(11, dutyAmount);
+            motorDirection |= B01000000;
+            motorDirection &= ~B10000000;
+            break;
+    
+          case 0x53: //S  Stops the motor (turns all ports to digital low)
+          case 0x73: //s
+            analogWrite(6, 0);
+            PORTD &= ~B01000000;
+            motorDirection &= B11111100;
+            break;
+          case 0xa6: //S  Stops the motor (turns all ports to digital low)
+          case 0xe6: //s
+            analogWrite(9, 0);
+            PORTD &= ~B01000000;
+            motorDirection &= B11110011;
+            break;
+          case 0x14c: //S  Stops the motor (turns all ports to digital low)
+          case 0x1cc: //s
+            analogWrite(10, 0);
+            PORTD &= ~B01000000;
+            motorDirection &= B11001111;
+            break;
+          case 0x298: //S  Stops the motor (turns all ports to digital low)
+          case 0x398: //s
+            analogWrite(11, 0);
+            PORTD &= ~B01000000;
+            motorDirection &= B00111111;
+            break;
+          default: //Unhandled Command
+            break; 
+        }
+      }
+      writeCommand();
+    }
   } else {
     //Go into blocking wait call in order to reset
     handshake();
@@ -266,10 +188,8 @@ void resetMCM(){
   dutyAmountM3 = 0;
   dutyAmountM4 = 0;
   enable = true;
-  memset(incoming, 0, sizeof(incoming));
   command = 0x0;
-
-  commandReadComplete = false;
+  
   commandReady = false;
 
   initializeMcm();
@@ -296,11 +216,11 @@ void initializeMcm(){
 
   writeCommand();
 
-  timerM1 = micros();
-  timerM2 = micros();
-  timerM3 = micros();
-  timerM4 = micros();
-  autoTimeout = micros();
+  timerM1 = millis();
+  timerM2 = millis();
+  timerM3 = millis();
+  timerM4 = millis();
+  autoTimeout = millis();
 
   digitalWrite(6, LOW);
   digitalWrite(9, LOW);
@@ -310,7 +230,6 @@ void initializeMcm(){
   digitalWrite(A0, LOW);
   digitalWrite(A1, LOW);
   digitalWrite(A2, LOW);
-  digitalWrite(A3, LOW);
 
   Serial.println("Setup Finished for MCM");
 
