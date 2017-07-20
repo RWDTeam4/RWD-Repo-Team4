@@ -1,5 +1,6 @@
-static String ack = "ACK";  
+#define PROD
 
+static String ack = "ACK";  
 
 byte charCount = 0;
 byte motorCount = 0;
@@ -77,75 +78,119 @@ void loop(){
           case 0x46: //F Motor 1
           case 0x66: //f Motor 1
             analogWrite(6, dutyAmount);
-            motorDirection |= B00000001;
+            #ifdef PROD //Right Front Motor
+            motorDirection |=  B00000010;
+            motorDirection &= ~B00000001;
+            #endif
+            #ifndef PROD //Left Front Motor
+            motorDirection |=  B00000001;
             motorDirection &= ~B00000010;
+            #endif
             break;
           case 0x8c : //F Motor 2
           case 0xcc : //f Motor 2
             analogWrite(9, dutyAmount);
-            motorDirection |= B00000100;
+            #ifdef PROD //Left Front tMotor
+            motorDirection |=  B00000100;
             motorDirection &= ~B00001000;
+            #endif
+            #ifndef PROD //Left Rear Motor
+            motorDirection |=  B00000100;
+            motorDirection &= ~B00001000;
+            #endif
           	break;
           case 0x118 : //F Motor 3
           case 0x198 : //f Motor 3
             analogWrite(10, dutyAmount);
-            motorDirection |= B00100000;
+            #ifdef PROD //Right Rear Motor
+            motorDirection |=  B00100000;
             motorDirection &= ~B00010000;
+            #endif
+            #ifndef PROD //Right Front Motor
+            motorDirection |=  B00100000;
+            motorDirection &= ~B00010000;
+            #endif
           case 0x230 : //F Motor 4
           case 0x330 : //f Motor 4
             analogWrite(11, dutyAmount);
-            motorDirection |= B10000000;
+            #ifdef PROD //Left Rear Motor
+            motorDirection |=  B01000000;
+            motorDirection &= ~B10000000;
+            #endif
+            #ifndef PROD //Right Rear Motor
+            motorDirection |=  B10000000;
             motorDirection &= ~B01000000;
+            #endif
           	break;
     
           case 0x52: //R Motor 1
           case 0x72: //r Motor 1
             //Reverse Stuff
             analogWrite(6, dutyAmount);
+            #ifdef PROD //Right Front Motor
+            motorDirection |=  B00000001;
+            motorDirection &= ~B00000010;
+            #endif
+            #ifndef PROD //Left Front Motor
             motorDirection |= B00000010;
             motorDirection &= ~B00000001;
+            #endif
             break;
           case 0xa4: //R Motor 2
           case 0xe4: //r Motor 2
             analogWrite(9, dutyAmount);
-            motorDirection |= B00001000;
+            #ifdef PROD //Left Front Motor
+            motorDirection |=  B00001000;
             motorDirection &= ~B00000100;
+            #endif
+            #ifndef PROD //Left Rear Motor
+            motorDirection |=  B00001000;
+            motorDirection &= ~B00000100;
+            #endif
             break;
           case 0x148: //R Motor 3
           case 0x1c8: //r Motor 3
             analogWrite(10, dutyAmount);
-            motorDirection |= B00010000;
+            #ifdef PROD //Right Rear Motor
+            motorDirection |=  B00010000;
             motorDirection &= ~B00100000;
+            #endif
+            #ifndef PROD //Right Front Motor
+            motorDirection |=  B00010000;
+            motorDirection &= ~B00100000;
+            #endif
             break;
           case 0x290: //R Motor 4
           case 0x390: //r Motor 4
             analogWrite(11, dutyAmount);
-            motorDirection |= B01000000;
+            #ifdef PROD //Left Rear Motor
+            motorDirection |=  B10000000;
+            motorDirection &= ~B01000000;
+            #endif
+            #ifndef PROD //Right Rear Motor
+            motorDirection |=  B01000000;
             motorDirection &= ~B10000000;
+            #endif
             break;
     
           case 0x53: //S  Stops the motor (turns all ports to digital low)
           case 0x73: //s
             analogWrite(6, 0);
-            PORTD &= ~B01000000;
             motorDirection &= B11111100;
             break;
           case 0xa6: //S  Stops the motor (turns all ports to digital low)
           case 0xe6: //s
             analogWrite(9, 0);
-            PORTD &= ~B01000000;
             motorDirection &= B11110011;
             break;
           case 0x14c: //S  Stops the motor (turns all ports to digital low)
           case 0x1cc: //s
             analogWrite(10, 0);
-            PORTD &= ~B01000000;
             motorDirection &= B11001111;
             break;
           case 0x298: //S  Stops the motor (turns all ports to digital low)
           case 0x398: //s
             analogWrite(11, 0);
-            PORTD &= ~B01000000;
             motorDirection &= B00111111;
             break;
           default: //Unhandled Command
@@ -230,6 +275,7 @@ void initializeMcm(){
   digitalWrite(A0, LOW);
   digitalWrite(A1, LOW);
   digitalWrite(A2, LOW);
+//  digitalWrite(A3, LOW);
 
   Serial.println("Setup Finished for MCM");
 
