@@ -149,6 +149,7 @@ void loop() {
   if(electroMagnetOn && !electroMagnetDisabled){
     if((currentTime - electroMagnetStartTime + electroMagnetUse) >= electroMagnetTimeout){
       shutdownElectroMagnet();
+      electroMagnetDisabled = true;
     }
   }
 
