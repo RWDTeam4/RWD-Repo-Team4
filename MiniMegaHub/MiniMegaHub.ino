@@ -124,7 +124,7 @@ void setup() {
 
   dogClutchServo.attach(SERVO_PIN,550,2370);
   
-  pinMode(LED_PIN, OUTPUT);
+//  pinMode(LED_PIN, OUTPUT);
   pinMode(ELECTROMAGNET_PIN, OUTPUT);
   pinMode(DAC_PIN, OUTPUT);
 
@@ -359,8 +359,10 @@ String calculateSteering(float rxValue, float ryValue){
   motorCommand += rightFrontState + motorIntensityString + rightRearState + motorIntensityString;
   #endif
   #ifdef PROD
-  motorCommand = leftFrontState + motorIntensityString + rightFrontState + motorIntensityString;
-  motorCommand += leftRearState + motorIntensityString + rightRearState + motorIntensityString;
+  motorCommand = rightFrontState + motorIntensityString;
+  motorCommand += leftFrontState + motorIntensityString;
+  motorCommand += rightRearState + motorIntensityString;
+  motorCommand += leftRearState  + motorIntensityString;
   #endif
   return motorCommand;
 }
@@ -453,10 +455,10 @@ String calculateMovement(float xVal, float yVal){
   rightRear = lfScaleFactor*magnitude;
 
   #ifdef PROD
-  motorCommand = leftFrontState + calcMotorValueToHex(leftFront);
-  motorCommand += leftRearState + calcMotorValueToHex(leftRear);
-  motorCommand += rightFrontState + calcMotorValueToHex(rightFront);
+  motorCommand = rightFrontState + calcMotorValueToHex(rightFront);
+  motorCommand += leftFrontState + calcMotorValueToHex(leftFront);
   motorCommand += rightRearState + calcMotorValueToHex(rightRear);
+  motorCommand += leftRearState + calcMotorValueToHex(leftRear);
   #endif
   #ifndef PROD
   motorCommand = leftFrontState + calcMotorValueToHex(leftFront);
