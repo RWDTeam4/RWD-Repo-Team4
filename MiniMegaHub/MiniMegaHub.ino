@@ -35,6 +35,8 @@
 
 //Comment out line below to remove debug statements (will speed up processing overall)
 #define DEBUG_ROBOT 1
+//Comment out line below for test platform
+#define PROD 1
 
 #define DBLE 120 //Dead Band Lower End
 #define DBUE 135 //Dead Band Upper End
@@ -45,11 +47,15 @@ unsigned long commandTimer = 0;
 unsigned long currentTime = 0;
 unsigned long ledTimer = 0;
 unsigned long servoTimer = 0;
+unsigned long electroMagnetUse = 0;
+unsigned long electroMagnetStartTime = 0;
+unsigned long electroMagnetEndTime = 0;
 
 //Timeouts
 static unsigned long motorCommandTimeout = 5000000; // 5 seconds
 static unsigned long ledTimeout = 50000; // 0.05 seconds
 static unsigned long servoTimeout = 50000; // 0.05 seconds
+static unsigned long electroMagnetTimeout = 30000000;
 
 //Bluetooth To Motor Control Variables
 float lyValue = 0;
@@ -73,7 +79,6 @@ static byte AC_MOTOR_MAX_PWM = 128;
 static byte AC_MOTOR_MIN_PWM = 0;
 static byte LIMIT_MAX = 255;
 static byte LIMIT_MIN = 0;
-//static int Stepping = 300;
 static byte SERVO_LIMIT = 90;
 
 //Pins 
@@ -88,6 +93,8 @@ Servo dogClutchServo;
 
 boolean acSpinUp = false;
 boolean servoTriggered = false;
+boolean electroMagnetDisabled = false;
+boolean electroMagnetOn = false;
 
 String ack = "ACK";
 
@@ -138,6 +145,12 @@ void setup() {
 void loop() {
   currentTime = micros();
   // put your main code here, to run repeatedly:
+
+  if(electroMagnetOn && !electroMagnetDisabled){
+    if((currentTime - electroMagnetStartTime + electroMagnetUse) >= electroMagnetTimeout){
+      shutdownElectroMagnet();
+    }
+  }
 
   if(servoTriggered){
     if(currentTime - servoTimer >= servoTimeout){
@@ -339,9 +352,14 @@ String calculateSteering(float rxValue, float ryValue){
   motorIntensityRaw = motorIntensityRaw > 255.0 ? 255.0 : motorIntensityRaw; //Cap this value
   String motorIntensityString = calcMotorValueToHex(motorIntensityRaw);
 
+  #ifndef PROD
   motorCommand = leftFrontState + motorIntensityString + leftRearState + motorIntensityString;
   motorCommand += rightFrontState + motorIntensityString + rightRearState + motorIntensityString;
-  
+  #endif
+  #ifdef PROD
+  motorCommand = leftFrontState + motorIntensityString + rightFrontState + motorIntensityString;
+  motorCommand += leftRearState + motorIntensityString + rightRearState + motorIntensityString;
+  #endif
   return motorCommand;
 }
 
@@ -432,10 +450,18 @@ String calculateMovement(float xVal, float yVal){
   leftRear = rfScaleFactor*magnitude;
   rightRear = lfScaleFactor*magnitude;
 
+  #ifdef PROD
   motorCommand = leftFrontState + calcMotorValueToHex(leftFront);
   motorCommand += leftRearState + calcMotorValueToHex(leftRear);
   motorCommand += rightFrontState + calcMotorValueToHex(rightFront);
   motorCommand += rightRearState + calcMotorValueToHex(rightRear);
+  #endif
+  #ifndef PROD
+  motorCommand = leftFrontState + calcMotorValueToHex(leftFront);
+  motorCommand += rightFrontState + calcMotorValueToHex(rightFront);
+  motorCommand += leftRearState + calcMotorValueToHex(leftRear);
+  motorCommand += rightRearState + calcMotorValueToHex(rightRear);
+  #endif
 
   return motorCommand;
 }
@@ -563,14 +589,16 @@ void readPS3Command(){
   if(input == "@TT"){
     servoTrigger();
   }
-//  if(input == "@R1"){
-//    //Increase ADC_PWM value and cut off at upper limit
-//    ADC_PWM = ADC_PWM + 10 <= AC_MOTOR_MAX_PWM ? ADC_PWM + 10 : AC_MOTOR_MAX_PWM;
-//  }
-//  if(input == "@L1"){
-//    //Decrease ADC_PWM value and cut off at lower limit
-//    ADC_PWM = ADC_PWM - 10 <= AC_MOTOR_MIN_PWM ? ADC_PWM - 10 : AC_MOTOR_MIN_PWM;
-//  }
+  if(!electroMagnetDisabled){
+    if(input == "@R1"){
+      powerElectroMagnet();
+    }
+  
+    if(input == "@L1"){
+      shutdownElectroMagnet();
+    }
+  }
+
 
   if(lxReady && lyReady && rxReady && ryReady){
     commandTimer = micros();
@@ -638,4 +666,17 @@ void servoTrigger(){
 void servoReset(){
   servoTriggered = false;
   servoAction(LIMIT_MIN);
+}
+
+void powerElectroMagnet(){
+  electroMagnetOn = true;
+  digitalWrite(ELECTROMAGNET_PIN, LOW);
+  electroMagnetStartTime = micros();
+}
+
+void shutdownElectroMagnet(){
+  digitalWrite(ELECTROMAGNET_PIN, HIGH);
+  electroMagnetEndTime = micros();
+  electroMagnetUse += (electroMagnetEndTime - electroMagnetStartTime);
+  electroMagnetOn = false;
 }
