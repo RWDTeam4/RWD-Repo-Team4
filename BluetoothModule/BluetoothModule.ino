@@ -22,7 +22,8 @@ BTD Btd(&Usb); // You have to create the Bluetooth Dongle instance like so
 /* You can create the instance of the class in two ways */
 // PS3BT PS3(&Btd); // This will just create the instance
 // PS3BT PS3(&Btd, 0x00, 0x1A, 0x7D, 0xDA, 0x71, 0x13); // This will also store the bluetooth address - this can be obtained from the dongle when running the sketch
-PS3BT PS3(&Btd, 0xE0, 0xAE, 0x5E, 0x29, 0x8F, 0x51); // This will also store the bluetooth address - this can be obtained from the dongle when running the sketch
+// PS3BT PS3(&Btd, 0xE0, 0xAE, 0x5E, 0x29, 0x8F, 0x51); // This will also store the bluetooth address - this can be obtained from the dongle when running the sketch
+PS3BT PS3(&Btd, 0x00, 0x1A, 0x7D, 0xDA, 0x71, 0x11); //CHINA CRAP CONTROLLER (Black PS3 controller, lightweight)
 
 bool printTemperature, printAngle;
 // static String endDelimiter = "\r\n";
