@@ -128,9 +128,10 @@ void setup() {
   pinMode(ELECTROMAGNET_PIN, OUTPUT);
   pinMode(DAC_PIN, OUTPUT);
 
+  digitalWrite(DAC_PIN, LOW);
   digitalWrite(ELECTROMAGNET_PIN, HIGH);
 
-  acInitialization();
+//  acInitialization();
   delay(1000);
   servoInitialization();
   pixels.begin();
