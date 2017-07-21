@@ -85,7 +85,10 @@ static byte SERVO_LIMIT = 90;
 static byte DAC_PIN = 2;
 static byte SERVO_PIN = 4;
 static byte LED_PIN = 20;
-static byte ELECTROMAGNET_PIN = 21; 
+static byte ELECTROMAGNET_PIN = 21;
+
+// Change the value below to scale down the motor power.
+static float MOTOR_POWER_SCALER = 1.0;
 
 int ADC_PWM = 0;
 
@@ -313,20 +316,20 @@ void commandReadMe(){
 #endif
 
 
-/**
- *  Using Joystick values, creates the command to be sent to the Motor Control Module
- */
-String createDriveCommand(int lyValue, int lxValue, int ryValue, int rxValue){
-  String motorCommand = "";
-  String steeringCommand = "";
-  String movementCommand = "";
-
-  steeringCommand = calculateSteering(rxValue, ryValue);
-  movementCommand = calculateMovement(lxValue, lyValue);
-
-  motorCommand = mixSteeringAndMovement(movementCommand, steeringCommand);
-  return motorCommand;
-}
+///**
+// *  Using Joystick values, creates the command to be sent to the Motor Control Module
+// */
+//String createDriveCommand(int lyValue, int lxValue, int ryValue, int rxValue){
+//  String motorCommand = "";
+//  String steeringCommand = "";
+//  String movementCommand = "";
+//
+//  steeringCommand = calculateSteering(rxValue, ryValue);
+//  movementCommand = calculateMovement(lxValue, lyValue, rxValue);
+//
+//  motorCommand = mixSteeringAndMovement(movementCommand, steeringCommand);
+//  return motorCommand;
+//}
 
 /**
  *  Only uses the x axis value to judge whether you're stearing left or right
@@ -370,16 +373,19 @@ String calculateSteering(float rxValue, float ryValue){
 /**
  *  Basic Mecanum movement, derives motor values based on angles and directional ma
  */
-String calculateMovement(float xVal, float yVal){
+String calculateMovement(float xVal, float yVal, float zVal){
   
   String motorCommand = "";
 
   float inY = STICK_CENTER - yVal;
   float inX = xVal - STICK_CENTER;
+  float inZ = zVal - STICK_CENTER;
   inY = inY >= STICK_CENTER ? STICK_CENTER : inY;
   inX = inX >= STICK_CENTER ? STICK_CENTER : inX;
+  inZ = inZ >= STICK_CENTER ? STICK_CENTER : inZ;
   inY = inY <= -STICK_CENTER ? -STICK_CENTER : inY;
   inX = inX <= -STICK_CENTER ? -STICK_CENTER : inX;
+  inZ = inZ <= -STICK_CENTER ? -STICK_CENTER : inZ;
   float magnitude = sqrt(sq(inY) + sq(inX));
   float myArcSin = asin(inY/magnitude);
   float myArcCosine = acos(inX/magnitude);
@@ -449,10 +455,10 @@ String calculateMovement(float xVal, float yVal){
   }
   //Set Motor Speed
   //Calculate Base motor speeds then convert to strings to be used
-  leftFront = lfScaleFactor*magnitude;
-  rightFront = rfScaleFactor*magnitude;
-  leftRear = rfScaleFactor*magnitude;
-  rightRear = lfScaleFactor*magnitude;
+  leftFront = lfScaleFactor*magnitude + inZ;
+  rightFront = rfScaleFactor*magnitude - inZ;
+  leftRear = rfScaleFactor*magnitude - inZ;
+  rightRear = lfScaleFactor*magnitude + inZ;
 
   #ifdef PROD
   motorCommand = rightFrontState + calcMotorValueToHex(rightFront);
@@ -470,40 +476,40 @@ String calculateMovement(float xVal, float yVal){
   return motorCommand;
 }
 
-/**
- *  Simple averaging of the steering joystick and the movement joystick commands
- */
-String mixSteeringAndMovement(String steeringCommand, String movementCommand){
-  String finishedMotorCommand = "";
-  char steering[steeringCommand.length()];
-  char movement[movementCommand.length()];
-  steeringCommand.toCharArray(steering, sizeof steering);
-  movementCommand.toCharArray(movement, sizeof movement);
-  for(int i =0; i<4; i++ ){
-    byte dcp = i*3; //direction char position
-    int steeringInt = 0;
-    int movementInt = 0;
-    int steeringModifier = directionModifier(steering[dcp]);
-    int movementModifier = directionModifier(movement[dcp]);
-    
-    for(int j = dcp+1; j<= dcp+2; j++){
-      steeringInt += charToHex(steering[j])<<((dcp + 2 - j)*4);
-      movementInt += charToHex(movement[j])<<((dcp + 2 - j)*4);
-    }
-    char newDirection = 'S';
-    float newMotorValue = (steeringModifier*steeringInt+movementModifier*movementInt)/2.0;
-    if(newMotorValue > 0){
-      newDirection = 'F';
-    }
-    if(newMotorValue < 0 ){
-      newDirection = 'R';
-    }
-
-    finishedMotorCommand += newDirection + calcMotorValueToHex(newMotorValue);
-  }
-
-  return finishedMotorCommand;
-}
+///**
+// *  Simple averaging of the steering joystick and the movement joystick commands
+// */
+//String mixSteeringAndMovement(String steeringCommand, String movementCommand){
+//  String finishedMotorCommand = "";
+//  char steering[steeringCommand.length()];
+//  char movement[movementCommand.length()];
+//  steeringCommand.toCharArray(steering, sizeof steering);
+//  movementCommand.toCharArray(movement, sizeof movement);
+//  for(int i =0; i<4; i++ ){
+//    byte dcp = i*3; //direction char position
+//    int steeringInt = 0;
+//    int movementInt = 0;
+//    int steeringModifier = directionModifier(steering[dcp]);
+//    int movementModifier = directionModifier(movement[dcp]);
+//    
+//    for(int j = dcp+1; j<= dcp+2; j++){
+//      steeringInt += charToHex(steering[j])<<((dcp + 2 - j)*4);
+//      movementInt += charToHex(movement[j])<<((dcp + 2 - j)*4);
+//    }
+//    char newDirection = 'S';
+//    float newMotorValue = (steeringModifier*steeringInt+movementModifier*movementInt)/2.0;
+//    if(newMotorValue > 0){
+//      newDirection = 'F';
+//    }
+//    if(newMotorValue < 0 ){
+//      newDirection = 'R';
+//    }
+//
+//    finishedMotorCommand += newDirection + calcMotorValueToHex(newMotorValue);
+//  }
+//
+//  return finishedMotorCommand;
+//}
 
 int directionModifier(char dir){
   switch(dir){
@@ -519,7 +525,7 @@ int directionModifier(char dir){
 
 //ConvertFloat into two character hex.
 String calcMotorValueToHex(float raw){
-  int rawInt = (int) ((raw/STICK_CENTER)*255.0);
+  int rawInt = (int) ((raw/STICK_CENTER)*255.0*MOTOR_POWER_SCALER);
   rawInt = rawInt > 255 ? 255 : rawInt;
   String motorValInHex = String(rawInt, HEX);
   if(rawInt <= 0xF){
@@ -610,11 +616,11 @@ void readPS3Command(){
     boolean leftStickInDeadband = lyValue > DBLE && lyValue < DBUE && lxValue > DBLE && lxValue < DBUE;
     boolean rightStickInDeadband = ryValue > DBLE && ryValue < DBUE && rxValue > DBLE && rxValue < DBUE;
     if( !leftStickInDeadband && !rightStickInDeadband ){
-      driveCommand = createDriveCommand(lyValue, lxValue, ryValue, rxValue); 
+      driveCommand = calculateMovement(lyValue, lxValue, rxValue); 
     }else if( leftStickInDeadband && !rightStickInDeadband){
       driveCommand = calculateSteering(rxValue, ryValue);
     }else if( !leftStickInDeadband && rightStickInDeadband) {
-      driveCommand = calculateMovement(lxValue, lyValue);
+      driveCommand = calculateMovement(lxValue, lyValue, STICK_CENTER);
     }else{
       driveCommand = resetMotorCommand();
     }
