@@ -167,7 +167,7 @@ void loop() {
   if(currentTime - ledTimer >= ledTimeout){
     for(int i=0;i<NUMBER_OF_LEDS;i++){
       // pixels.Color takes RGB values, from 0,0,0 up to 255,255,255
-      pixels.setPixelColor(i, pixels.Color((rStart+5)%255,(gStart + 10)%255,(bStart + 20)%255)); 
+      pixels.setPixelColor(i, pixels.Color((rStart+=random(255))%255 - (rStart/255)*255,(gStart += random(255))%255 - (gStart/255)*255,(bStart += random(255))%255 - (bStart/255)*255)); 
       pixels.show();
     }
     ledTimer = micros();
