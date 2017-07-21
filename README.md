@@ -29,3 +29,6 @@ Circuitry diagrams will hopefully soon follow to show anyone who discovers this 
 * X -           Un-assigned
 * Circle -      Un-assigned
 * PS3 Button -  Disconnect the Controller
+
+## Reading Material
+* [Motor Input Mixing](http://thinktank.wpi.edu/resources/346/ControllingMecanumDrive.pdf)
